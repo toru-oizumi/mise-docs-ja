@@ -301,14 +301,14 @@ mise settings add idiomatic_version_file_enable_tools node
 これらはすべて同じ核心的な処理を行います。つまり、mise が管理するツールを使用できるように環境（主に `PATH`）を
 整えます。違いは、_いつ_、_どのように_ それを行うかです。
 
-| Method                              | How it works                                           | Best for                                   |
+| 方法                                 | 動作の仕組み                                            | 向いている用途                             |
 | ------------------------------------ | ------------------------------------------------------ | ------------------------------------------ |
 | `mise activate`                     | シェルプロンプトにフックし、動的に PATH を更新する      | インタラクティブなターミナルでの使用       |
 | `mise activate --shims`             | shim ディレクトリを一度だけ PATH に追加する             | IDE、シンプルな構成（フック・env 未対応）  |
 | `mise exec` / `mise x`              | 環境を整え、単一のコマンドを実行してから終了する        | スクリプト、CI、単発のコマンド             |
 | `mise env`                          | `eval` できる環境変数を出力する                         | 他のツールとの連携                         |
 | `mise run`                          | 環境を整えてからタスクを実行する                        | タスクの実行                               |
-| Shims (`~/.local/share/mise/shims`) | 呼び出しごとに mise を呼び出すラッパースクリプト        | 非インタラクティブなシェル、IDE            |
+| shim（`~/.local/share/mise/shims`） | 呼び出しごとに mise を呼び出すラッパースクリプト        | 非インタラクティブなシェル、IDE            |
 
 ::: warning
 `mise activate --shims` は、フック、`[env]` からの環境変数、`watch_files` を**サポートしません**。shim を PATH に

@@ -1,6 +1,9 @@
 ---
 layout: home
 title: mise ドキュメント日本語訳（非公式）
+# トップページは title 自体がサイト名なので、titleTemplate で
+# サイト名を後置すると同じ文字列が2回並ぶ
+titleTemplate: false
 
 hero:
   name: mise ドキュメント

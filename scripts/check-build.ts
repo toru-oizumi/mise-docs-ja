@@ -30,6 +30,16 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+/** 拡張子を問わず全ファイルを列挙する */
+function walkAll(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) walkAll(p, out);
+    else out.push(p);
+  }
+  return out;
+}
+
 type Problem = { page: string; message: string };
 const problems: Problem[] = [];
 
@@ -86,6 +96,8 @@ for (const { docPath, html } of translatedHtml) {
 // 4. mise のロゴ・favicon を使っていないか（全ページ）
 console.log("\n── ブランドの混入 ──");
 const allHtml = walk(DIST);
+// キー類は HTML ではなく JS/CSS チャンクに紛れ込むので、そちらも走査する
+const allAssets = walkAll(DIST).filter((p) => /\.(js|css|mjs)$/.test(p));
 const brandPatterns = [
   { re: /logo-(light|dark|full-light|full-dark)\.svg/, what: "mise のロゴ画像" },
   { re: /android-chrome-\d+x\d+\.png/, what: "mise の PWA アイコン" },
@@ -97,17 +109,20 @@ const brandPatterns = [
   },
   { re: /googletagmanager\.com|G-B69G389C8T/, what: "本家の Google Analytics" },
   { re: /carbonads|CWYIPKQN/, what: "本家の広告タグ" },
-  { re: /algolia|1452G4RPSJ/i, what: "本家の Algolia 検索キー" },
+  // 「algolia」という語では判定しない。VitePress 標準テーマは docsearch 版の
+  // UI を CSS/JS にバンドルしているので、ローカル検索を使っていても語自体は残る。
+  // 判定するのは本家の実際のキーだけ。
+  { re: /1452G4RPSJ|ad09b96a7d2a30eddc2771800da7a1cf/, what: "本家の Algolia 検索キー" },
 ];
-for (const html of allHtml) {
-  const content = readFileSync(html, "utf8");
+for (const file of [...allHtml, ...allAssets]) {
+  const content = readFileSync(file, "utf8");
   for (const p of brandPatterns) {
     if (p.re.test(content)) {
-      problems.push({ page: relative(DIST, html), message: `${p.what} が混入している` });
+      problems.push({ page: relative(DIST, file), message: `${p.what} が混入している` });
     }
   }
 }
-console.log(`  ${allHtml.length} ページを走査`);
+console.log(`  ${allHtml.length} ページ + ${allAssets.length} アセットを走査`);
 
 // 5. 自前のトップページには canonical を付けない（原文が存在しないので）
 console.log("\n── 自前ページ ──");
