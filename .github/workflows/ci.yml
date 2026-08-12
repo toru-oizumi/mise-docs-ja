@@ -22,6 +22,7 @@ jobs:
       - run: mise run fmt:check
       - run: mise run lint
       - run: mise run typecheck
+      - run: mise run check:workflows
 
       # 原文と訳の構造の 1:1 対応。コードブロックの1文字の改変もここで落ちる
       - run: mise run verify

@@ -9,7 +9,15 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ASSETS, TRANSLATED, UPSTREAM_BRANCH, UPSTREAM_DOCS_DIR, UPSTREAM_REPO } from "./scope.ts";
@@ -20,6 +28,19 @@ const SYNC = resolve(ROOT, ".sync");
 const REF_FILE = resolve(ROOT, ".upstream-ref");
 
 const apply = process.argv.includes("--apply");
+
+/**
+ * GitHub Actions の $GITHUB_OUTPUT に機械可読な結果を書く。
+ *
+ * 人間向けの日本語の出力を CI 側で grep すると、文言を変えた瞬間に静かに壊れる。
+ * 実際に `contains(..., '変更あり: 0')` という条件を書いたところ、
+ * YAML のプレーンスカラーに `: ` を入れたせいでワークフロー全体が構文エラーになった。
+ */
+function emitOutput(key: string, value: string | number) {
+  const file = process.env.GITHUB_OUTPUT;
+  if (!file) return;
+  appendFileSync(file, `${key}=${value}\n`);
+}
 
 function git(args: string[], cwd: string): string {
   return execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 28 });
@@ -56,6 +77,9 @@ function main() {
 
   if (oldRef === newRef) {
     console.log("\n差分なし。追従済みです。");
+    emitOutput("changed", 0);
+    emitOutput("deleted", 0);
+    emitOutput("upstream_ref", newRef);
     return;
   }
 
@@ -137,6 +161,10 @@ function main() {
     .filter((p) => !p.startsWith("cli/"));
   const notInScope = upstreamDocs.filter((p) => !known.has(p));
   console.log(`\nスコープ外の原文ページ: ${notInScope.length} 件（cli/ を除く）`);
+
+  emitOutput("changed", modified.length);
+  emitOutput("deleted", deleted.length);
+  emitOutput("upstream_ref", newRef);
 
   if (!apply) {
     console.log(

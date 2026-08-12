@@ -58,6 +58,10 @@ run = "oxfmt"
 description = "整形されているか確認する（CI 用）"
 run = "oxfmt --check"
 
+[tasks."check:workflows"]
+description = "GitHub Actions のワークフローが YAML として妥当か検査"
+run = "bun scripts/check-workflows.ts"
+
 [tasks."check:conventions"]
 description = "コミットメッセージが言語ルールに従っているか検査（既定は HEAD の1件）"
 run = "bun scripts/check-conventions.ts"
@@ -84,6 +88,7 @@ depends = [
   "lint",
   "typecheck",
   "check:conventions",
+  "check:workflows",
   "verify",
   "check:links",
   "check:build",

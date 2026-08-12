@@ -12,7 +12,8 @@
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
-    "types": ["node"]
+    // Bun.YAML など bun のグローバル API を使うので bun の型も入れる
+    "types": ["node", "bun"]
   },
   // .vue は tsc では見られないので typecheck の対象外。
   // Layout.vue / UnofficialBanner.vue の型は VitePress のビルドが見る。

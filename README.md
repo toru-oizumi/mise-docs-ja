@@ -33,7 +33,7 @@ scripts/         同期と検証
 mise run install        依存をインストール（bun）
 mise run dev            開発サーバー
 mise run build          本番ビルド
-mise run check          公開前の全チェック（下の6つをまとめて実行）
+mise run check          公開前の全チェック（下の8つをまとめて実行）
 
 mise run fmt            oxfmt で整形（Markdown は対象外）
 mise run fmt:check      整形されているかの確認
@@ -42,6 +42,8 @@ mise run typecheck      TypeScript の型検査
 mise run verify         原文と訳の構造が 1:1 対応しているかを機械照合
 mise run check:links    リンク切れとアンカー切れ
 mise run check:build    ビルド成果物の検査（バナー・canonical・ブランドの混入）
+mise run check:workflows  GitHub Actions のワークフローが YAML として妥当か
+mise run check:conventions コミットメッセージの言語ルール
 
 mise run anchors        原文の見出しから、訳文で付けるべきアンカーを出力
 mise run sync           本家の最新を取得して差分を表示（翻訳はしない）

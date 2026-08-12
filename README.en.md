@@ -33,7 +33,7 @@ Committing `upstream/` is the keystone of the sync design. Because the original 
 mise run install        Install dependencies (bun)
 mise run dev            Dev server
 mise run build          Production build
-mise run check          All pre-publish checks (runs the six below)
+mise run check          All pre-publish checks (runs the eight below)
 
 mise run fmt            Format with oxfmt (Markdown excluded)
 mise run fmt:check      Verify formatting
@@ -42,6 +42,8 @@ mise run typecheck      TypeScript type check
 mise run verify         Machine-check that translations map 1:1 to the original
 mise run check:links    Broken links and anchors
 mise run check:build    Inspect build output (banner, canonical, brand leakage)
+mise run check:workflows  Validate the GitHub Actions workflow YAML
+mise run check:conventions Check commit message conventions
 
 mise run anchors        Emit the anchors a translation must use, from the original headings
 mise run sync           Fetch upstream and show the diff (does not translate)
