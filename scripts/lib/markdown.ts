@@ -52,6 +52,8 @@ export type Link = {
   text: string;
   href: string;
   line: number;
+  /** `![alt](src)` なら true。alt テキストは訳す対象なので区別する */
+  image: boolean;
 };
 
 export type Parsed = {
@@ -80,8 +82,18 @@ const ANCHOR_RE = /\s*\{#([^}]+)\}\s*$/;
 const LINK_RE = /(!?)\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
 const CONTAINER_RE = /^:::+\s*([a-zA-Z-]*)/;
 const LIST_ITEM_RE = /^\s*(?:[-*+]|\d+\.)\s+\S/;
-/** vitepress-plugin-tabs のタブ見出し。`== Linux/macOS` の形 */
-const TAB_LABEL_RE = /^==\s+(.+)$/;
+/**
+ * vitepress-plugin-tabs のタブ見出し。
+ *
+ * プラグインの実装（dist/node/index.js の ruleBlockTab）は minTabMarkerLen = 2 で
+ * 連続する `=` をすべて消費し、残りを trimStart してラベルにする。つまり
+ * `== Linux/macOS` も `=== VSCode` も有効で、後者のラベルは `VSCode` になる。
+ * 原文には両方の表記が混在しているので、`=` の数を 2 以上として受ける。
+ *
+ * `(\S.*)` を必須にしているのは、setext 見出しの下線（`===` だけの行）を
+ * タブ見出しと誤認しないため。
+ */
+const TAB_LABEL_RE = /^={2,}[ \t]*(\S.*)$/;
 
 /** 見出しテキストを markdown-it が slugify に渡す平文に落とす */
 export function inlineToPlain(text: string): string {
@@ -190,14 +202,14 @@ export function parse(src: string): Parsed {
     if (LIST_ITEM_RE.test(line)) out.listItems++;
 
     for (const m of line.matchAll(LINK_RE)) {
-      out.links.push({ text: m[2], href: m[3], line: i + 1 });
+      out.links.push({ text: m[2], href: m[3], line: i + 1, image: m[1] === "!" });
     }
   }
 
   // 見出し行に含まれるリンクも拾う（見出し内リンクは稀だが数を合わせる）
   for (const h of out.headings) {
     for (const m of h.text.matchAll(LINK_RE)) {
-      out.links.push({ text: m[2], href: m[3], line: h.line });
+      out.links.push({ text: m[2], href: m[3], line: h.line, image: m[1] === "!" });
     }
   }
 

@@ -234,32 +234,90 @@ function checkFrontmatter(tran: Parsed, docPath: string): Issue[] {
   return issues;
 }
 
-/** コードブロック外の本文が原文のまま残っている段落を検出する */
+const hasJa = /[ぁ-んァ-ヶ一-龠]/;
+
+/**
+ * 行を「訳す対象の文章」に落とす。
+ * URL は訳さないので落とし、リンクテキストと画像の alt は訳す対象なので残す。
+ * これをしないと `- Emacs: [mise.el](https://github.com/liuyinz/mise.el)` のような
+ * 固有名詞と URL だけの行が、URL の長さのせいで未訳として誤検出される。
+ */
+function prose(line: string): string {
+  return line
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/<https?:\/\/[^>]*>/g, "")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/`[^`]*`/g, "")
+    .trim();
+}
+
+/**
+ * コードブロックを空行に置き換える。行を削除すると行番号がずれて、
+ * 報告する L番号が実ファイルと合わなくなる。
+ */
+function blankFences(s: string): string[] {
+  const lines = s.replace(/^---\n[\s\S]*?\n---\n/, (m) => m.replace(/[^\n]/g, "")).split("\n");
+  let fence: string | undefined;
+  return lines.map((l) => {
+    const m = l.match(/^\s*(`{3,}|~{3,})/);
+    if (fence) {
+      if (m && m[1][0] === fence[0] && m[1].length >= fence.length) fence = undefined;
+      return "";
+    }
+    if (m) {
+      fence = m[1];
+      return "";
+    }
+    return l;
+  });
+}
+
+/** コードブロック外の本文が原文のまま残っている行を検出する */
 function checkUntranslated(origSrc: string, tranSrc: string): Issue[] {
   const issues: Issue[] = [];
-  const strip = (s: string) =>
-    s
-      .replace(/^---\n[\s\S]*?\n---\n/, "")
-      .replace(/^(\s*)(`{3,}|~{3,})[\s\S]*?\n\s*\2\s*$/gm, "")
-      .split("\n");
-  const origParas = new Set(
-    strip(origSrc)
-      .map((l) => l.trim())
-      .filter((l) => l.length > 40 && /[a-zA-Z]/.test(l)),
+  const origProse = new Set(
+    blankFences(origSrc)
+      .map((l) => prose(l))
+      .filter((l) => l.length > 25 && /[a-zA-Z]/.test(l)),
   );
-  const hasJa = /[ぁ-んァ-ヶ一-龠]/;
-  for (const [i, line] of strip(tranSrc).entries()) {
+  for (const [i, line] of blankFences(tranSrc).entries()) {
     const t = line.trim();
-    // タブ見出しは固有名詞だけのことが多く（`== Debian/Ubuntu (apt)`）、
-    // 原語のままが正しい。訳し残しの検出対象から外す。
-    if (t.startsWith("== ")) continue;
-    if (t.length > 40 && !hasJa.test(t) && origParas.has(t)) {
+    // 訳す対象でない行を外す。
+    // - タブ見出しは固有名詞だけのことが多い（`== Debian/Ubuntu (apt)`）
+    // - `:::` コンテナの開始行はラベルを訳さない決まり
+    // - HTML コメントは markdownlint 指示や訳注
+    if (/^={2,}/.test(t) || t.startsWith(":::") || t.startsWith("<!--")) continue;
+    const p = prose(line);
+    if (p.length > 25 && !hasJa.test(p) && origProse.has(p)) {
       issues.push({
         level: "warn",
-        message: `原文のまま残っている可能性がある行 (L${i + 1}): ${t.slice(0, 70)}…`,
+        message: `原文のまま残っている可能性がある行 (L${i + 1}): ${p.slice(0, 70)}…`,
       });
     }
   }
+  return issues;
+}
+
+/**
+ * 画像の alt テキストの訳し漏れを検出する。
+ * alt は本文と違って目に見えないので、レビューで最も見落とされる。
+ */
+function checkAltText(orig: Parsed, tran: Parsed): Issue[] {
+  const issues: Issue[] = [];
+  const oImgs = orig.links.filter((l) => l.image);
+  const tImgs = tran.links.filter((l) => l.image);
+  if (oImgs.length !== tImgs.length) return issues; // リンク数の不一致は別途報告される
+  oImgs.forEach((o, i) => {
+    const t = tImgs[i];
+    // 空でなく、語句（空白を含む）で、原文と同一なら訳し漏れ。
+    // 単語1つの alt はファイル名や固有名詞のことが多いので対象外。
+    if (o.text.trim() !== "" && o.text.includes(" ") && o.text === t.text && !hasJa.test(t.text)) {
+      issues.push({
+        level: "warn",
+        message: `画像の alt テキストが原文のまま (L${t.line}): ![${t.text}](…)`,
+      });
+    }
+  });
   return issues;
 }
 

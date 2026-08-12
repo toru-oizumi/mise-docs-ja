@@ -76,6 +76,15 @@
 | symlink | シンボリックリンク | |
 | rc file | rc ファイル | `~/.zshrc` 等。訳さない |
 | approach | アプローチ | |
+| safe mode | セーフモード | `MISE_SAFE` はコード識別子なので原語のまま |
+| modern plugins | モダンプラグイン | `asdf plugins` との対比で使われる固定カテゴリ名 |
+| shorthand | 省略形 | |
+| cookbook | クックブック | |
+| formula | フォーミュラ | Homebrew の用語 |
+| manifest | マニフェスト | Scoop / winget の用語 |
+| community repository | コミュニティリポジトリ | |
+| bit rot | 陳腐化 | 原語併記はしない |
+| usage | usage | `https://usage.jdx.dev` のツール名。訳さない |
 
 ## 訳さないもの（原語のまま）
 
@@ -103,6 +112,8 @@
 | you'll probably want to ... | 〜しておくとよいでしょう（「〜する必要があります」は誤り。任意の推奨を必須に変えてしまう） |
 | Yes / No（テーブルの対応表） | はい / いいえ |
 | Feature（テーブルのヘッダ） | 機能 |
+| Something else? | その他のシェルは？（文脈に応じて「その他は？」） |
+| ::: details Example X | ::: details X の例（ラベル `details` は訳さず、タイトルだけ訳す） |
 
 ## 見出しの定型
 

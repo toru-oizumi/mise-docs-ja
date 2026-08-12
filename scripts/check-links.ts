@@ -20,6 +20,27 @@ import { anchorFor, parse } from "./lib/markdown.ts";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = resolve(ROOT, "src");
 
+/**
+ * 原文の側で既に壊れているリンク。
+ *
+ * CLAUDE.md は「原文の誤りを訳で勝手に直さない」と定めているので、訳文は原文の
+ * まま維持している。ここに記録して検査から除外し、事実を repo に残す。
+ * 本家が直したら差分同期で自然に解消するので、そのときこの表から削る。
+ */
+const UPSTREAM_BROKEN: Array<{ page: string; href: string; note: string }> = [
+  {
+    page: "src/walkthrough.md",
+    href: "#misetoml-configuration",
+    note:
+      "原文 docs/walkthrough.md L119 のリンク先が #misetoml-configuration だが、" +
+      "見出し `## \\`mise.toml\\` Configuration` の実際のアンカーは " +
+      "#mise-toml-configuration。原文サイト（mise.jdx.dev）でも同じく壊れている。",
+  },
+];
+
+const isKnownUpstreamBreakage = (page: string, href: string): boolean =>
+  UPSTREAM_BROKEN.some((b) => b.page === page && b.href === href);
+
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     if (name.startsWith(".")) continue;
@@ -67,7 +88,7 @@ for (const file of files) {
     // 同一ページ内のアンカー
     if (href.startsWith("#")) {
       const a = href.slice(1);
-      if (!anchors.get(file)!.has(a)) {
+      if (!anchors.get(file)!.has(a) && !isKnownUpstreamBreakage(rel, href)) {
         problems.push(`L${link.line} ページ内アンカーが存在しない: ${href}`);
       }
       continue;
@@ -108,9 +129,16 @@ for (const file of files) {
   }
 }
 
+if (UPSTREAM_BROKEN.length > 0) {
+  console.log(`\n原文の側で壊れているため検査から除外したリンク（${UPSTREAM_BROKEN.length} 件）:`);
+  for (const b of UPSTREAM_BROKEN) {
+    console.log(`  ${b.page}  ${b.href}\n    ${b.note}`);
+  }
+}
+
 console.log(
   errors === 0
-    ? `✔ リンク切れなし（${files.length} ページ）`
+    ? `\n✔ リンク切れなし（${files.length} ページ）`
     : `\n合計 ${errors} 件のリンク問題（${files.length} ページ）`,
 );
 process.exit(errors > 0 ? 1 : 0);

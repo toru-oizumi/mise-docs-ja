@@ -146,7 +146,7 @@ vim.env.PATH = vim.env.HOME .. "/.local/share/mise/shims:" .. vim.env.PATH
 一部の JetBrains IDE（や言語プラグイン）は `mise` を直接サポートしています。これにより、IDE の設定から SDK のバージョンを選択できます。
 Java の場合の例です。
 
-![SDK settings](./intellij-sdk-selection.png)
+![SDK の設定](./intellij-sdk-selection.png)
 
 ### asdf レイアウトを使った SDK 選択 {#sdk-selection-using-asdf-layout}
 
@@ -159,11 +159,11 @@ ln -s ~/.local/share/mise ~/.asdf
 
 そうすると、Project Settings に表示されるはずです。
 
-![project settings](https://github.com/jdx/mise-docs/assets/216188/b34a0e3f-7af8-45c9-85b8-2c72bd1dc226)
+![プロジェクトの設定](https://github.com/jdx/mise-docs/assets/216188/b34a0e3f-7af8-45c9-85b8-2c72bd1dc226)
 
 node の場合（おそらく他の言語も）は、「Languages & Frameworks」の下にあります。
 
-![languages & frameworks](https://github.com/jdx/mise-docs/assets/216188/9926be1c-ab88-451a-8ace-edf2dac564b5)
+![Languages & Frameworks](https://github.com/jdx/mise-docs/assets/216188/9926be1c-ab88-451a-8ace-edf2dac564b5)
 
 ## VSCode {#vscode}
 
