@@ -134,6 +134,35 @@ mise run anchors -- <ファイル>
 - `settings` を「設定」とだけ訳す → 設定ファイル全般と区別するため「設定項目」
 - `experimental` を「試験的」と「実験的」で揺らす → 「実験的」に統一
 
+## 言語の使い分け（強制ルール）
+
+**訳文とドキュメントは日本語、コミットと PR タイトルは英語。** CI が強制しているので、違反すると PR が落ちる。
+
+| 対象 | 言語 | 形式 |
+|---|---|---|
+| コミットメッセージ（1行目も本文も） | **英語** | Conventional Commits |
+| PR のタイトル | **英語** | Conventional Commits |
+| PR の本文 | **日本語** | `.github/pull_request_template.md` に従う |
+| 訳文・ドキュメント・コード内コメント | **日本語** | |
+
+コミットメッセージの形式は `<type>(<scope>): <subject>`。type は `feat` / `fix` / `docs` / `refactor` / `test` / `chore` / `ci` / `build` / `perf` / `style` / `revert`。**訳文の追加・更新は `docs`** を使う。1行目は 72 文字以内。
+
+```
+docs(tasks): translate toml-tasks.md
+fix(verify): resolve relative links against the page directory
+chore(deps): bump vitepress to 1.6.4
+```
+
+`Co-Authored-By:` などのトレーラー行は検査の対象外。
+
+コミット前に手元で確認できる。
+
+```
+mise run check:conventions
+```
+
+`Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>` を付けること。
+
 ## 差分同期時のルール
 
 `.sync/` に原文の unified diff が置かれている場合:

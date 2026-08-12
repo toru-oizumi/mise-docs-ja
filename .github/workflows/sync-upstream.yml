@@ -16,8 +16,8 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v2
+      - uses: actions/checkout@v5
+      - uses: jdx/mise-action@v4
         with:
           version: 2026.8.3
       - run: mise run install
@@ -31,7 +31,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - if: contains(steps.sync.outputs.report, '変更あり: 0') == false
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const report = ${{ toJSON(steps.sync.outputs.report) }}

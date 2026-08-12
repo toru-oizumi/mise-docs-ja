@@ -1,5 +1,7 @@
 # mise ドキュメント日本語訳（非公式）
 
+日本語 | [English](./README.en.md)
+
 [mise](https://github.com/jdx/mise)（mise-en-place）公式ドキュメントの**非公式**日本語訳です。mise の開発元とは関係ありません。
 
 翻訳は LLM をベースに行い、生成物はすべてコミットして差分でレビューできる形にしています。ビルド時の動的翻訳はしていません。
@@ -51,6 +53,31 @@ mise run stale          追従できていないページの一覧
 
 **`oxfmt` は Markdown を整形しません**（`.oxfmtrc.json` で除外）。訳文を再整形すると行の折り返しやテーブルの桁が変わり、原文との 1:1 対応が壊れて差分同期が成立しなくなるためです。
 
+
+## このリポジトリのルール
+
+言語の使い分けを固定しています。理由は、コミット履歴と PR タイトルは GitHub や
+ツールが横断的に読む機械可読な面であり、PR 本文とドキュメントは人間が読む面だからです。
+
+| 対象 | 言語 | 形式 |
+|---|---|---|
+| コミットメッセージ | **英語** | [Conventional Commits](https://www.conventionalcommits.org/) |
+| PR のタイトル | **英語** | Conventional Commits |
+| PR の本文 | **日本語** | `.github/pull_request_template.md` に従う |
+| 訳文・ドキュメント・コード内コメント | **日本語** | |
+
+コミットメッセージの例。
+
+```
+feat(sync): report pages that upstream deleted
+fix(verify): resolve relative links against the page directory
+docs(tasks): translate toml-tasks.md
+chore(deps): bump vitepress to 1.6.4
+```
+
+使う type は `feat` / `fix` / `docs` / `refactor` / `test` / `chore` / `ci` / `build` / `perf` / `style` / `revert`。訳文を追加・更新するコミットは `docs` を使います。
+
+**これらは CI で強制しています**（`.github/workflows/conventions.yml`）。PR のタイトルと、その PR に含まれるコミットのメッセージを検査し、英語でない場合や Conventional Commits でない場合は落ちます。
 
 ## 翻訳するとき
 

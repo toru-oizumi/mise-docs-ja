@@ -58,6 +58,10 @@ run = "oxfmt"
 description = "整形されているか確認する（CI 用）"
 run = "oxfmt --check"
 
+[tasks."check:conventions"]
+description = "コミットメッセージが言語ルールに従っているか検査（既定は HEAD の1件）"
+run = "bun scripts/check-conventions.ts"
+
 [tasks.verify]
 description = "原文と訳の構造が 1:1 対応しているか機械的に検証"
 run = "bun scripts/verify.ts"
@@ -75,4 +79,12 @@ run = "bun scripts/check-build.ts"
 
 [tasks.check]
 description = "公開前の全チェック"
-depends = ["fmt:check", "lint", "typecheck", "verify", "check:links", "check:build"]
+depends = [
+  "fmt:check",
+  "lint",
+  "typecheck",
+  "check:conventions",
+  "verify",
+  "check:links",
+  "check:build",
+]

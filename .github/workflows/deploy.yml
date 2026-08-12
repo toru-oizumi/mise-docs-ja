@@ -19,10 +19,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # mise のドキュメントサイトなので、ツールの用意は mise 自身に任せる
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v4
         with:
           version: 2026.8.3
 
@@ -40,8 +40,8 @@ jobs:
 
       - run: mise run check:build
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: src/.vitepress/dist
 
@@ -53,4 +53,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
