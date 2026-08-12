@@ -1,55 +1,78 @@
 min_version = "2025.1.0"
 
 [tools]
+# CI と手元で同じものが入るようバージョンは固定する。
+# vitepress / vite は node を前提にした挙動が残っているので node も入れておく。
+bun = "1.3.14"
 node = "24"
+oxlint = "1.78.0"
+oxfmt = "0.63.0"
+
+[tasks.install]
+description = "依存をインストール"
+run = "bun install --frozen-lockfile"
 
 [tasks.dev]
 description = "開発サーバーを起動"
-run = "vitepress dev src"
+run = "bun x vitepress dev src"
 
 [tasks.build]
 description = "本番ビルド"
-run = "vitepress build src"
+run = "bun x vitepress build src"
 
 [tasks.preview]
 description = "ビルド結果をローカルで確認"
-run = "vitepress preview src"
+run = "bun x vitepress preview src"
 
 [tasks.sync]
 description = "本家の最新を取得して差分を表示（翻訳はしない）"
-run = "tsx scripts/sync-upstream.ts"
+# bun は TypeScript をそのまま実行できるので tsx を挟まない
+run = "bun scripts/sync-upstream.ts"
 
 [tasks."sync:apply"]
 description = "upstream/ と .upstream-ref を最新に進める（訳の更新と同一コミットに含める）"
-run = "tsx scripts/sync-upstream.ts --apply"
+run = "bun scripts/sync-upstream.ts --apply"
 
 [tasks.stale]
 description = "追従できていないページを一覧表示"
-run = "tsx scripts/report-stale.ts"
+run = "bun scripts/report-stale.ts"
 
 [tasks.anchors]
 description = "原文の見出しから、訳文で付けるべきアンカーを出力"
-run = "tsx scripts/anchors.ts"
+run = "bun scripts/anchors.ts"
 
 [tasks.typecheck]
 description = "TypeScript の型検査（scripts と .vitepress の .ts）"
-run = "tsc --noEmit"
+run = "bun x tsc --noEmit"
+
+[tasks.lint]
+description = "oxlint"
+# 警告も落とす。未使用の関数を検出したことが実際にバグ（検査の繋ぎ忘れ）だった
+run = "oxlint --deny-warnings"
+
+[tasks.fmt]
+description = "oxfmt で整形する"
+run = "oxfmt"
+
+[tasks."fmt:check"]
+description = "整形されているか確認する（CI 用）"
+run = "oxfmt --check"
 
 [tasks.verify]
 description = "原文と訳の構造が 1:1 対応しているか機械的に検証"
-run = "tsx scripts/verify.ts"
+run = "bun scripts/verify.ts"
 
 [tasks."check:links"]
 description = "リンク切れとアンカー切れを検査"
-run = "tsx scripts/check-links.ts"
+run = "bun scripts/check-links.ts"
 
 [tasks."check:build"]
 description = "ビルド成果物を検査（バナー・canonical・ブランドの混入）"
 # dist を読むので build の完了が前提。mise は depends を並列に走らせるため、
 # check にまとめて並べるのではなくここで順序を固定する
 depends = ["build"]
-run = "tsx scripts/check-build.ts"
+run = "bun scripts/check-build.ts"
 
 [tasks.check]
 description = "公開前の全チェック"
-depends = ["typecheck", "verify", "check:links", "check:build"]
+depends = ["fmt:check", "lint", "typecheck", "verify", "check:links", "check:build"]

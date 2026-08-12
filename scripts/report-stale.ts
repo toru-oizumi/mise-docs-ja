@@ -40,13 +40,19 @@ const rows: Row[] = TRANSLATED.map((entry) => {
   const ref = fmValue(fm, "upstreamRef");
   const date = fmValue(fm, "upstreamDate");
   const matches = ref !== "" && (currentRef.startsWith(ref) || ref === short);
-  return { path: entry.path, state: matches ? "追従済み" : "要確認", ref: ref || "(なし)", date: date || "-" };
+  return {
+    path: entry.path,
+    state: matches ? "追従済み" : "要確認",
+    ref: ref || "(なし)",
+    date: date || "-",
+  };
 });
 
 /** 全角文字を2桁として数える。padEnd だけでは日本語の列がずれる */
 const displayWidth = (s: string): number =>
   [...s].reduce((n, c) => n + (/[ᄀ-ᅟ⺀-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]/.test(c) ? 2 : 1), 0);
-const pad = (s: string, width: number): string => s + " ".repeat(Math.max(0, width - displayWidth(s)));
+const pad = (s: string, width: number): string =>
+  s + " ".repeat(Math.max(0, width - displayWidth(s)));
 
 const width = Math.max(...rows.map((r) => r.path.length));
 

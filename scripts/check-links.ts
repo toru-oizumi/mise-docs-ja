@@ -20,27 +20,6 @@ import { anchorFor, parse } from "./lib/markdown.ts";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = resolve(ROOT, "src");
 
-/**
- * 原文の側で既に壊れているリンク。
- *
- * CLAUDE.md は「原文の誤りを訳で勝手に直さない」と定めているので、訳文は原文の
- * まま維持している。ここに記録して検査から除外し、事実を repo に残す。
- * 本家が直したら差分同期で自然に解消するので、そのときこの表から削る。
- */
-const UPSTREAM_BROKEN: Array<{ page: string; href: string; note: string }> = [
-  {
-    page: "src/walkthrough.md",
-    href: "#misetoml-configuration",
-    note:
-      "原文 docs/walkthrough.md L119 のリンク先が #misetoml-configuration だが、" +
-      "見出し `## \\`mise.toml\\` Configuration` の実際のアンカーは " +
-      "#mise-toml-configuration。原文サイト（mise.jdx.dev）でも同じく壊れている。",
-  },
-];
-
-const isKnownUpstreamBreakage = (page: string, href: string): boolean =>
-  UPSTREAM_BROKEN.some((b) => b.page === page && b.href === href);
-
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     if (name.startsWith(".")) continue;
@@ -64,7 +43,10 @@ for (const file of files) {
 
 /** リンク表記を src/ 内の実ファイルに解決する */
 function resolveTarget(fromFile: string, href: string): string | undefined {
-  const bare = href.split("#")[0].replace(/\.html$/, "").replace(/\.md$/, "");
+  const bare = href
+    .split("#")[0]
+    .replace(/\.html$/, "")
+    .replace(/\.md$/, "");
   const base = href.startsWith("/") ? SRC : dirname(fromFile);
   const path = href.startsWith("/") ? bare.slice(1) : bare;
   const candidates =
@@ -85,10 +67,13 @@ for (const file of files) {
     const href = link.href;
     if (/^(https?:)?\/\//.test(href) || href.startsWith("mailto:")) continue;
 
-    // 同一ページ内のアンカー
+    // 同一ページ内のアンカー。
+    // 原文の側で壊れているページ内リンクは、訳文で正しいアンカーに直す方針なので
+    // （CLAUDE.md「例外: 原文のページ内リンクが壊れている場合は直す」）、
+    // ここで除外リストを持つ必要はない。落ちたら訳文を直す。
     if (href.startsWith("#")) {
       const a = href.slice(1);
-      if (!anchors.get(file)!.has(a) && !isKnownUpstreamBreakage(rel, href)) {
+      if (!anchors.get(file)!.has(a)) {
         problems.push(`L${link.line} ページ内アンカーが存在しない: ${href}`);
       }
       continue;
@@ -126,13 +111,6 @@ for (const file of files) {
     errors += problems.length;
     console.log(`✘ ${rel}`);
     for (const p of problems) console.log(`    ${p}`);
-  }
-}
-
-if (UPSTREAM_BROKEN.length > 0) {
-  console.log(`\n原文の側で壊れているため検査から除外したリンク（${UPSTREAM_BROKEN.length} 件）:`);
-  for (const b of UPSTREAM_BROKEN) {
-    console.log(`  ${b.page}  ${b.href}\n    ${b.note}`);
   }
 }
 

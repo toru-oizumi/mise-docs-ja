@@ -14,6 +14,9 @@
  * アンカーが1文字違えば原文サイトからの deep link が切れるので、
  * 推測せず本物と同じ規則を使う。
  */
+// oxlint(no-control-regex) を意図的に抑止する。制御文字のクラスは
+// VitePress の実装をそのまま写したものなので、書き換えると slugify がずれる。
+// eslint-disable-next-line no-control-regex
 const rControl = /[\u0000-\u001f]/g;
 const rSpecial = /[\s~`!@#$%^&*()\-_+=[\]{}|\\;:"'\u201c\u201d\u2018\u2019<>,.?/]+/g;
 const rCombining = /[\u0300-\u036F]/g;
@@ -154,7 +157,9 @@ export function parse(src: string): Parsed {
     const fence = line.match(FENCE_RE);
     if (fence) {
       const [, indent, marker, info] = fence;
-      const closeRe = new RegExp(`^\\s{0,${indent.length + 3}}${marker[0]}{${marker.length},}\\s*$`);
+      const closeRe = new RegExp(
+        `^\\s{0,${indent.length + 3}}${marker[0]}{${marker.length},}\\s*$`,
+      );
       const body: string[] = [];
       let closed = false;
       for (i++; i < lines.length; i++) {

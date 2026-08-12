@@ -9,23 +9,10 @@
  */
 
 import { execFileSync } from "node:child_process";
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  ASSETS,
-  TRANSLATED,
-  UPSTREAM_BRANCH,
-  UPSTREAM_DOCS_DIR,
-  UPSTREAM_REPO,
-} from "./scope.ts";
+import { ASSETS, TRANSLATED, UPSTREAM_BRANCH, UPSTREAM_DOCS_DIR, UPSTREAM_REPO } from "./scope.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CLONE = resolve(ROOT, ".upstream-clone");

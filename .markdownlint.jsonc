@@ -9,5 +9,5 @@
   "MD034": false, // 裸の URL。原文が markdownlint-disable している
   "MD040": false, // 言語指定のないコードフェンス。原文のまま保つ
   "MD060": false, // テーブルの桁揃え。和文は全角なので原文と同じ桁数に揃えられない
-  "MD041": false // 先頭行が h1 でない。frontmatter があるため
+  "MD041": false, // 先頭行が h1 でない。frontmatter があるため
 }

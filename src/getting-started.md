@@ -3,7 +3,7 @@ title: はじめに
 upstreamPath: docs/getting-started.md
 upstreamUrl: https://mise.jdx.dev/getting-started.html
 upstreamRef: 1c7db9f9
-upstreamDate: 2026-08-12
+upstreamDate: "2026-08-12"
 ---
 
 <!-- markdownlint-disable MD034 -->
@@ -82,7 +82,7 @@ sudo snap install mise --classic
 
 ## 2. mise の `exec` と `run` {#mise-exec-run}
 
-インストールが完了すれば、すぐに mise を使って [ツール](/dev-tools/) のインストールと実行、[タスク](/tasks/) の起動、[環境変数](/environments/) の管理を行うことができます。
+インストールが完了すれば、すぐに mise で [ツール](/dev-tools/) のインストールと実行、[タスク](/tasks/) の起動、[環境変数](/environments/) の管理ができます。
 
 特定バージョンのツールを実行する最も手早い方法は [`mise x|exec`（原文）](https://mise.jdx.dev/cli/exec.html) です。例えば、Python 3 の REPL を起動するには:
 

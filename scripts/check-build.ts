@@ -91,7 +91,10 @@ const brandPatterns = [
   { re: /android-chrome-\d+x\d+\.png/, what: "mise の PWA アイコン" },
   { re: /apple-touch-icon\.png/, what: "mise の apple-touch-icon" },
   { re: /favicon\.ico/, what: "mise の favicon.ico" },
-  { re: /mise\.jdx\.dev\/(favicon|logo|android-chrome|apple-touch)/, what: "本家のブランド資産への参照" },
+  {
+    re: /mise\.jdx\.dev\/(favicon|logo|android-chrome|apple-touch)/,
+    what: "本家のブランド資産への参照",
+  },
   { re: /googletagmanager\.com|G-B69G389C8T/, what: "本家の Google Analytics" },
   { re: /carbonads|CWYIPKQN/, what: "本家の広告タグ" },
   { re: /algolia|1452G4RPSJ/i, what: "本家の Algolia 検索キー" },

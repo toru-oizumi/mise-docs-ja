@@ -64,6 +64,7 @@
 | cache | キャッシュ | |
 | shell | シェル | |
 | flag / option | オプション | CLI の `--foo`。「フラグ」と揺らさない |
+| flag（usage spec の `{{flag()}}`） | フラグ | **例外。** タスクの usage spec では `{{option()}}`（値を取る名前付き引数）と `{{flag()}}`（値を取らない真偽スイッチ）が別概念として並ぶ。両方を「オプション」にすると読者がどちらの関数か区別できないので、この文脈に限り「フラグ」を使う。使うファイルの冒頭に `<!-- verify-allow: フラグ -->` を書いて意図を明示する |
 | argument | 引数 | |
 | subcommand | サブコマンド | |
 | output | 出力 | |
@@ -85,6 +86,13 @@
 | community repository | コミュニティリポジトリ | |
 | bit rot | 陳腐化 | 原語併記はしない |
 | usage | usage | `https://usage.jdx.dev` のツール名。訳さない |
+| shebang | シバン | 「シェバン」と揺らさない |
+| spec（usage spec） | spec | usage ツール固有の語。「仕様」と訳さない |
+| redaction / redact | redaction（値の削除）/ 値を削除する | 初出時のみ原語併記 |
+| monorepo | モノレポ | |
+| schema | スキーマ | |
+| fuzzy matching | あいまい一致（fuzzy matching） | 初出時のみ原語併記 |
+| Tera | Tera | テンプレートエンジン名。訳さない |
 
 ## 訳さないもの（原語のまま）
 

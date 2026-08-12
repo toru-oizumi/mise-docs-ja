@@ -26,9 +26,10 @@ jobs:
         with:
           version: 2026.8.3
 
-      - run: npm ci
+      - run: mise run install
 
       # 訳と原文の構造が崩れていたらデプロイしない
+      - run: mise run lint
       - run: mise run typecheck
       - run: mise run verify
       - run: mise run check:links

@@ -13,7 +13,8 @@ const { frontmatter } = useData();
 
 const upstreamUrl = computed(() => frontmatter.value.upstreamUrl as string | undefined);
 const ref = computed(
-  () => (frontmatter.value.upstreamRef ?? frontmatter.value.upstreamRefFallback) as string | undefined,
+  () =>
+    (frontmatter.value.upstreamRef ?? frontmatter.value.upstreamRefFallback) as string | undefined,
 );
 /**
  * YAML は `upstreamDate: 2026-08-12` をクォートしないと Date として解釈するので、
@@ -31,8 +32,8 @@ const date = computed(() => {
 <template>
   <aside v-if="upstreamUrl" class="unofficial-banner" aria-label="この翻訳について">
     <p class="unofficial-banner__lead">
-      これは有志による<strong>非公式の日本語訳</strong>です。mise の開発元とは関係ありません。
-      LLM による機械翻訳をベースに作成しているため、誤訳や古い記述が含まれることがあります。
+      これは有志による<strong>非公式の日本語訳</strong>です。mise の開発元とは関係ありません。 LLM
+      による機械翻訳をベースに作成しているため、誤訳や古い記述が含まれることがあります。
       <strong>正確な情報は原文を参照してください。</strong>
     </p>
     <p class="unofficial-banner__meta">

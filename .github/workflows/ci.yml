@@ -10,13 +10,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # mise のドキュメントサイトなので、ツールの用意は mise 自身に任せる。
+      # bun / node / oxlint / oxfmt のバージョンは mise.toml で固定している。
       - uses: jdx/mise-action@v2
         with:
           version: 2026.8.3
-      - run: npm ci
+
+      - run: mise run install
+
+      - run: mise run fmt:check
+      - run: mise run lint
+      - run: mise run typecheck
 
       # 原文と訳の構造の 1:1 対応。コードブロックの1文字の改変もここで落ちる
-      - run: mise run typecheck
       - run: mise run verify
       - run: mise run check:links
       - run: mise run build

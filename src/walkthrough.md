@@ -115,7 +115,8 @@ MY_VAR = "123"
 - cargo のテストを直列に実行するために `RUST_TEST_THREADS=1` を設定する
 
 プロジェクトの mise.toml にシークレットを設定しないでください。このファイルはバージョン管理に追加されることを意図しています。
-シークレットには、代わりに [`mise.local.toml` を使ってください](#misetoml-configuration)。
+<!-- 原文のリンク先は #misetoml-configuration だが、実在するアンカーは #mise-toml-configuration。原文サイトでも壊れている -->
+シークレットには、代わりに [`mise.local.toml` を使ってください](#mise-toml-configuration)。
 
 `mise.toml` で `PATH` を変更することもできます。この例は、`npm` でインストールした CLI を使えるようにするものです。
 

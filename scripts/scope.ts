@@ -97,14 +97,46 @@ export function linkToDocPath(link: string): string {
 export function docPathToLink(docPath: string): string {
   if (docPath === "index.md") return "/";
   const base = docPath.replace(/\.md$/, "");
-  return base.endsWith("/index")
-    ? `/${base.slice(0, -"index".length)}`
-    : `/${base}`;
+  return base.endsWith("/index") ? `/${base.slice(0, -"index".length)}` : `/${base}`;
 }
 
-/** そのページを翻訳したか */
-export function isTranslated(link: string): boolean {
-  return BY_PATH.has(linkToDocPath(link));
+/** `a/b/../c` → `a/c`。posix の正規化を自前で行う（path モジュールに依存しない） */
+function normalizeSegments(path: string): string {
+  const out: string[] = [];
+  for (const seg of path.split("/")) {
+    if (seg === "" || seg === ".") continue;
+    if (seg === "..") out.pop();
+    else out.push(seg);
+  }
+  return out.join("/");
+}
+
+/**
+ * ページ内に書かれたリンクを upstream/docs/ 相対のパスに解決する。
+ *
+ * `fromDocPath` を要求するのは、原文が `./comparison-to-asdf` や `../templates`
+ * のような相対リンクを多用しているため。これを解決せずに判定すると、
+ * 同じディレクトリにある翻訳済みページを未翻訳と誤判定し、
+ * 「原文サイトに飛ばせ」という誤った指示を出してしまう。
+ */
+export function resolveHref(fromDocPath: string, href: string): string {
+  const bare = href.split("#")[0];
+  if (bare === "") return fromDocPath;
+  if (bare.startsWith("/")) return linkToDocPath(bare);
+  const dir = fromDocPath.includes("/") ? fromDocPath.slice(0, fromDocPath.lastIndexOf("/")) : "";
+  const joined = normalizeSegments(`${dir}/${bare}`);
+  // ディレクトリ指定（末尾スラッシュ）は normalizeSegments が落とすので復元する
+  const trailing = bare.endsWith("/") ? "/" : "";
+  return linkToDocPath(`/${joined}${trailing}`);
+}
+
+/**
+ * そのページを翻訳したか。
+ * 相対リンクを正しく判定するには fromDocPath が必要。
+ */
+export function isTranslated(link: string, fromDocPath?: string): boolean {
+  const docPath = fromDocPath ? resolveHref(fromDocPath, link) : linkToDocPath(link);
+  return BY_PATH.has(docPath);
 }
 
 /** 訳文の title を引く */

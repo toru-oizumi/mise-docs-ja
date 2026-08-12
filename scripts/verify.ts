@@ -14,7 +14,14 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { anchorFor, parse, type Parsed } from "./lib/markdown.ts";
-import { TRANSLATED, isTranslated, upstreamUrl, UPSTREAM_SITE } from "./scope.ts";
+import {
+  TRANSLATED,
+  isTranslated,
+  resolveHref,
+  titleOf,
+  upstreamUrl,
+  UPSTREAM_SITE,
+} from "./scope.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -26,14 +33,26 @@ const green = color(32);
 const yellow = color(33);
 const dim = color(90);
 
-/** CLAUDE.md と glossary.md が明示的に禁じている訳語 */
-const BANNED: Array<{ pattern: RegExp; reason: string }> = [
-  { pattern: /することができます/, reason: "「〜できます」にする（glossary 定型フレーズ）" },
-  { pattern: /フラグ/, reason: "flag / option は「オプション」に統一（glossary）" },
-  { pattern: /試験的/, reason: "experimental は「実験的」に統一（glossary）" },
-  { pattern: /フォルダ/, reason: "directory は「ディレクトリ」（glossary）" },
-  { pattern: /トラスト/, reason: "trust は「信頼」（CLAUDE.md よくある誤訳）" },
-  { pattern: /あなたは/, reason: "二人称は原則省略（CLAUDE.md 文体）" },
+/**
+ * CLAUDE.md と glossary.md が明示的に禁じている訳語。
+ *
+ * `term` を別に持つのは、oxfmt が正規表現リテラル内の非 ASCII を
+ * `フラグ` のようにエスケープするため。`pattern.source` を
+ * そのまま突き合わせのキーにすると、整形した瞬間に `verify-allow` が効かなくなる。
+ */
+const BANNED: Array<{ term: string; pattern: RegExp; reason: string }> = [
+  // 「することができます」だけを見ていると「置くことができます」「使うことができます」を
+  // 見逃す。glossary の意図は冗長な可能表現を避けることなので、活用語尾を含めて拾う。
+  {
+    term: "ことができます",
+    pattern: /ことができます/,
+    reason: "「〜できます」にする（glossary 定型フレーズ）",
+  },
+  { term: "フラグ", pattern: /フラグ/, reason: "flag / option は「オプション」に統一（glossary）" },
+  { term: "試験的", pattern: /試験的/, reason: "experimental は「実験的」に統一（glossary）" },
+  { term: "フォルダ", pattern: /フォルダ/, reason: "directory は「ディレクトリ」（glossary）" },
+  { term: "トラスト", pattern: /トラスト/, reason: "trust は「信頼」（CLAUDE.md よくある誤訳）" },
+  { term: "あなたは", pattern: /あなたは/, reason: "二人称は原則省略（CLAUDE.md 文体）" },
 ];
 
 type Issue = { level: "error" | "warn"; message: string };
@@ -107,7 +126,7 @@ function checkHeadings(orig: Parsed, tran: Parsed): Issue[] {
   return issues;
 }
 
-function checkLinks(orig: Parsed, tran: Parsed): Issue[] {
+function checkLinks(orig: Parsed, tran: Parsed, docPath: string): Issue[] {
   const issues: Issue[] = [];
   if (orig.links.length !== tran.links.length) {
     issues.push({
@@ -139,10 +158,10 @@ function checkLinks(orig: Parsed, tran: Parsed): Issue[] {
     if (l.href.startsWith("#")) continue;
     if (/\.(png|jpe?g|gif|svg|webp|mp4)$/i.test(l.href)) continue;
 
-    if (!isTranslated(l.href)) {
+    if (!isTranslated(l.href, docPath)) {
       issues.push({
         level: "error",
-        message: `未翻訳ページへの内部リンクが残っている (L${l.line}): [${l.text}](${l.href}) → ${upstreamUrl(l.href)} にして「（原文）」を付ける`,
+        message: `未翻訳ページへの内部リンクが残っている (L${l.line}): [${l.text}](${l.href}) → ${upstreamUrl(resolveHref(docPath, l.href))} にして「（原文）」を付ける`,
       });
     } else if (l.text.includes("（原文）")) {
       issues.push({
@@ -231,6 +250,27 @@ function checkFrontmatter(tran: Parsed, docPath: string): Issue[] {
       message: `frontmatter の upstreamUrl が違う: ${wantUrl} にする`,
     });
   }
+  // クォートしないと YAML が Date 型として解釈し、バナーの表示が
+  // 2026-08-12T00:00:00.000Z になる。実際に踏んだので検査する。
+  if (/^upstreamDate:\s*\d{4}-\d{2}-\d{2}\s*$/m.test(fm)) {
+    issues.push({
+      level: "error",
+      message:
+        'upstreamDate をクォートする（`upstreamDate: "2026-08-12"`）。YAML が Date 型にしてしまう',
+    });
+  }
+  // title はサイドバーの表示と共有しているので、scope.ts の値と一致させる
+  const wantTitle = titleOf(docPath);
+  const actualTitle = fm
+    .match(/^title:\s*(.*)$/m)?.[1]
+    ?.trim()
+    .replace(/^["']|["']$/g, "");
+  if (wantTitle && actualTitle && actualTitle !== wantTitle) {
+    issues.push({
+      level: "error",
+      message: `frontmatter の title がサイドバーと食い違う: 訳文「${actualTitle}」/ scope.ts「${wantTitle}」`,
+    });
+  }
   return issues;
 }
 
@@ -243,12 +283,19 @@ const hasJa = /[ぁ-んァ-ヶ一-龠]/;
  * 固有名詞と URL だけの行が、URL の長さのせいで未訳として誤検出される。
  */
 function prose(line: string): string {
-  return line
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/<https?:\/\/[^>]*>/g, "")
-    .replace(/https?:\/\/\S+/g, "")
-    .replace(/`[^`]*`/g, "")
-    .trim();
+  return (
+    line
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/<https?:\/\/[^>]*>/g, "")
+      .replace(/https?:\/\/\S+/g, "")
+      .replace(/`[^`]*`/g, "")
+      // テーブルの区切りとインデント・桁揃えの空白を畳む。
+      // これをしないと、中身がコード識別子だけの行（`| node | \`.node-version\` |`）が
+      // 桁揃えの空白の長さだけで「長い未訳の行」に見えてしまう。
+      .replace(/[|>*_-]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 /**
@@ -272,13 +319,24 @@ function blankFences(s: string): string[] {
   });
 }
 
+/**
+ * 英文の散文かどうかを機能語の有無で判定する。
+ *
+ * 固有名詞やコード識別子だけが並んだ行（テーブルの見出し行、ツール名の一覧、
+ * `CleanShot 2024-01-28 at 12 36 20@2x` のような自動生成 alt）は訳す対象では
+ * ないが、長さだけで判定すると未訳として誤検出される。英文の散文には必ず
+ * 機能語が混じるので、それを条件にする。
+ */
+const FUNCTION_WORDS =
+  /\b(the|a|an|to|of|for|is|are|was|were|this|that|these|those|you|your|it|its|and|or|but|if|when|with|without|in|on|from|by|as|not|than|then|there|which|what|how|so|such|also|both|each|other|more|most|some|any|all|no|will|would|should|can|could|may|might|must|have|has|had|do|does|did|be|been|being)\b/i;
+
 /** コードブロック外の本文が原文のまま残っている行を検出する */
 function checkUntranslated(origSrc: string, tranSrc: string): Issue[] {
   const issues: Issue[] = [];
   const origProse = new Set(
     blankFences(origSrc)
       .map((l) => prose(l))
-      .filter((l) => l.length > 25 && /[a-zA-Z]/.test(l)),
+      .filter((l) => l.length > 25 && FUNCTION_WORDS.test(l)),
   );
   for (const [i, line] of blankFences(tranSrc).entries()) {
     const t = line.trim();
@@ -288,7 +346,7 @@ function checkUntranslated(origSrc: string, tranSrc: string): Issue[] {
     // - HTML コメントは markdownlint 指示や訳注
     if (/^={2,}/.test(t) || t.startsWith(":::") || t.startsWith("<!--")) continue;
     const p = prose(line);
-    if (p.length > 25 && !hasJa.test(p) && origProse.has(p)) {
+    if (p.length > 25 && !hasJa.test(p) && FUNCTION_WORDS.test(p) && origProse.has(p)) {
       issues.push({
         level: "warn",
         message: `原文のまま残っている可能性がある行 (L${i + 1}): ${p.slice(0, 70)}…`,
@@ -311,7 +369,13 @@ function checkAltText(orig: Parsed, tran: Parsed): Issue[] {
     const t = tImgs[i];
     // 空でなく、語句（空白を含む）で、原文と同一なら訳し漏れ。
     // 単語1つの alt はファイル名や固有名詞のことが多いので対象外。
-    if (o.text.trim() !== "" && o.text.includes(" ") && o.text === t.text && !hasJa.test(t.text)) {
+    if (
+      o.text.trim() !== "" &&
+      o.text.includes(" ") &&
+      o.text === t.text &&
+      !hasJa.test(t.text) &&
+      FUNCTION_WORDS.test(t.text)
+    ) {
       issues.push({
         level: "warn",
         message: `画像の alt テキストが原文のまま (L${t.line}): ![${t.text}](…)`,
@@ -321,16 +385,40 @@ function checkAltText(orig: Parsed, tran: Parsed): Issue[] {
   return issues;
 }
 
+/**
+ * 禁止訳語のうち、そのファイルで意図的に使うと宣言されたものを集める。
+ *
+ *   <!-- verify-allow: フラグ -->
+ *
+ * 用語規則には正当な例外がある。たとえばタスクの usage spec では
+ * `{{option()}}` と `{{flag()}}` が別概念として並ぶので、両方を「オプション」に
+ * すると読者が区別できない。そうした逸脱を黙って通すのではなく、
+ * ファイルに宣言として残す。理由は glossary.md 側に書く。
+ */
+function allowedTerms(tranSrc: string): Set<string> {
+  const allowed = new Set<string>();
+  for (const m of tranSrc.matchAll(/<!--\s*verify-allow:\s*([^>]*?)\s*-->/g)) {
+    for (const term of m[1].split(/[,、]/)) {
+      const t = term.trim();
+      if (t) allowed.add(t);
+    }
+  }
+  return allowed;
+}
+
 function checkBanned(tranSrc: string): Issue[] {
   const issues: Issue[] = [];
-  const body = tranSrc.replace(/^(\s*)(`{3,}|~{3,})[\s\S]*?\n\s*\2\s*$/gm, "");
-  body.split("\n").forEach((line, i) => {
+  const allowed = allowedTerms(tranSrc);
+  // blankFences を使うのは行番号を実ファイルと一致させるため。
+  // 行を削除すると報告する L番号がずれて、探しに行っても何も無い。
+  blankFences(tranSrc).forEach((line, i) => {
     if (/^\s*`|^\s{4,}\S/.test(line)) return;
     for (const b of BANNED) {
+      if (allowed.has(b.term)) continue;
       if (b.pattern.test(line)) {
         issues.push({
           level: "warn",
-          message: `禁止訳語「${b.pattern.source}」 (L${i + 1}): ${b.reason}`,
+          message: `禁止訳語「${b.term}」 (L${i + 1}): ${b.reason}`,
         });
       }
     }
@@ -338,18 +426,15 @@ function checkBanned(tranSrc: string): Issue[] {
   return issues;
 }
 
-export function verifyPair(
-  origSrc: string,
-  tranSrc: string,
-  docPath: string,
-): Issue[] {
+export function verifyPair(origSrc: string, tranSrc: string, docPath: string): Issue[] {
   const orig = parse(origSrc);
   const tran = parse(tranSrc);
   return [
     ...checkFrontmatter(tran, docPath),
     ...checkHeadings(orig, tran),
     ...checkFences(orig, tran),
-    ...checkLinks(orig, tran),
+    ...checkLinks(orig, tran, docPath),
+    ...checkAltText(orig, tran),
     ...checkStructure(orig, tran),
     ...checkUntranslated(origSrc, tranSrc),
     ...checkBanned(tranSrc),
@@ -364,9 +449,7 @@ function main() {
   const ti = argv.indexOf("--translation");
   if (oi >= 0 && ti >= 0) {
     const docPath = argv[argv.indexOf("--doc-path") + 1] ?? "getting-started.md";
-    pairs = [
-      { label: argv[ti + 1], orig: argv[oi + 1], tran: argv[ti + 1], docPath },
-    ];
+    pairs = [{ label: argv[ti + 1], orig: argv[oi + 1], tran: argv[ti + 1], docPath }];
   } else {
     const targets = argv.length > 0 ? argv : TRANSLATED.map((e) => e.path);
     pairs = targets.map((p) => ({
@@ -407,9 +490,7 @@ function main() {
     for (const i of w) console.log(`    ${yellow("warn ")} ${i.message}`);
   }
 
-  console.log(
-    `\n合計: error ${errors} / warn ${warns} / 未翻訳 ${skipped} / 対象 ${pairs.length}`,
-  );
+  console.log(`\n合計: error ${errors} / warn ${warns} / 未翻訳 ${skipped} / 対象 ${pairs.length}`);
   process.exit(errors > 0 ? 1 : 0);
 }
 

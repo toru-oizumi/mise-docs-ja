@@ -52,6 +52,26 @@ mise run anchors -- <ファイル>
 
 `mise run verify` がアンカーの一致を検査するので、間違っていれば必ず落ちる。
 
+### 例外: 原文のページ内リンクが壊れている場合は直す
+
+原文の本文中のページ内リンク（`[foo](#bar)`）が、実在しないアンカーを指していることがある。**この場合だけは訳文で正しいアンカーに直す。** 死んだリンクを再現しても読者に何の利益もない。
+
+直したことが分かるように、原文の値を HTML コメントで残す。
+
+```markdown
+<!-- 原文のリンク先は #misetoml-configuration だが、実在するアンカーは #mise-toml-configuration -->
+[`mise.local.toml` を使う](#mise-toml-configuration)
+```
+
+これは「原文の誤りを勝手に直さない」の例外で、**リンクの機械的な破損に限る**。技術的な記述の誤りは対象外で、そちらは従来通り訳注に留めて勝手に直さない。
+
+実測で見つかった原文側の破損（いずれも原文サイトでも壊れている）:
+
+| 原文 | 壊れたリンク先 | 実在するアンカー |
+|---|---|---|
+| `docs/walkthrough.md` | `#misetoml-configuration` | `#mise-toml-configuration` |
+| `docs/configuration.md` | `#mise_default_config_filename` | `#mise-default-config-filename` |
+
 ## リンクの扱い
 
 - **翻訳済みページへのリンク** → 相対パスのまま維持
