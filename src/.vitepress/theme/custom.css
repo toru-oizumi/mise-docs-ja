@@ -1,0 +1,46 @@
+/*
+ * 本家の custom.css（1,863行）は流用していない。
+ * ロゴ・独自フォント・ランディングページ専用スタイルに密結合していて、
+ * 非公式訳サイトに持ち込むと追従コストだけが増える。
+ *
+ * ここには日本語表示のための最小限だけを置く。
+ */
+
+:root {
+  /* 和文を含む本文の行間。VitePress の既定は欧文前提でやや詰まって見える */
+  --vp-custom-block-font-size: 0.9rem;
+
+  /* 公式（緑系のブランドカラー）と色で誤認されないよう、意図的に別の色にする */
+  --vp-c-brand-1: #4b6bfb;
+  --vp-c-brand-2: #3d59d9;
+  --vp-c-brand-3: #2f45b0;
+  --vp-c-brand-soft: rgba(75, 107, 251, 0.14);
+}
+
+.vp-doc p,
+.vp-doc li {
+  line-height: 1.85;
+}
+
+/*
+ * 和欧混植のフォント指定。半角英数字はサイト側で等幅・プロポーショナルを
+ * 使い分け、和文は OS 標準のゴシックに任せる。
+ */
+:root {
+  --vp-font-family-base:
+    system-ui, -apple-system, "Segoe UI", "Helvetica Neue", "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+}
+
+/* サイドバーの「（原文）」が付いた項目は、未翻訳だと一目で分かるようにする */
+.VPSidebarItem .link-text {
+  word-break: auto-phrase;
+}
+
+/* サイトタイトルが長いので、狭い画面で折り返さず省略する */
+.VPNavBarTitle .title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60vw;
+}

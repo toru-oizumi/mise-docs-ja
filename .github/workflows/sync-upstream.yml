@@ -1,0 +1,74 @@
+name: Check upstream for changes
+
+# 週1で本家の差分を確認し、あれば issue を立てる。
+# 翻訳の自動 PR は作らない。レビューなしの訳が積み上がるのを防ぐため、
+# 着手のトリガーは必ず人間が引く（SETUP.md「自動化の温度感」）。
+on:
+  schedule:
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          version: 2026.8.3
+      - run: npm ci
+
+      - id: sync
+        run: |
+          {
+            echo 'report<<SYNC_EOF'
+            mise run sync
+            echo 'SYNC_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - if: contains(steps.sync.outputs.report, '変更あり: 0') == false
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const report = ${{ toJSON(steps.sync.outputs.report) }}
+            const title = '本家の原文に差分があります'
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'upstream-sync',
+            })
+            const body = [
+              '本家の原文が更新されています。`mise run sync` の出力:',
+              '',
+              '```',
+              report,
+              '```',
+              '',
+              '次にやること:',
+              '1. ローカルで `mise run sync` を実行して `.sync/*.diff` を読む',
+              '2. 訳に影響しない変更（typo 修正・リンク差し替え）なら更新不要と判断してよい',
+              '3. 更新が必要なものは、変更されたブロックだけを訳し直す',
+              '4. `mise run sync:apply` で `upstream/` を進め、訳の更新と同一コミットにする',
+            ].join('\n')
+
+            if (issues.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues[0].number,
+                body,
+              })
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['upstream-sync'],
+              })
+            }

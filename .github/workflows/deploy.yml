@@ -1,0 +1,53 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# デプロイは1本ずつ。走っているものは止めない（公開中のサイトを壊さないため）
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # mise のドキュメントサイトなので、ツールの用意は mise 自身に任せる
+      - uses: jdx/mise-action@v2
+        with:
+          version: 2026.8.3
+
+      - run: npm ci
+
+      # 訳と原文の構造が崩れていたらデプロイしない
+      - run: mise run typecheck
+      - run: mise run verify
+      - run: mise run check:links
+
+      - run: mise run build
+        env:
+          DOCS_BASE: /${{ github.event.repository.name }}/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: src/.vitepress/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

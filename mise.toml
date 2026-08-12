@@ -1,0 +1,48 @@
+min_version = "2025.1.0"
+
+[tools]
+node = "24"
+
+[tasks.dev]
+description = "開発サーバーを起動"
+run = "vitepress dev src"
+
+[tasks.build]
+description = "本番ビルド"
+run = "vitepress build src"
+
+[tasks.preview]
+description = "ビルド結果をローカルで確認"
+run = "vitepress preview src"
+
+[tasks.sync]
+description = "本家の最新を取得して差分を表示（翻訳はしない）"
+run = "tsx scripts/sync-upstream.ts"
+
+[tasks."sync:apply"]
+description = "upstream/ と .upstream-ref を最新に進める（訳の更新と同一コミットに含める）"
+run = "tsx scripts/sync-upstream.ts --apply"
+
+[tasks.stale]
+description = "追従できていないページを一覧表示"
+run = "tsx scripts/report-stale.ts"
+
+[tasks.anchors]
+description = "原文の見出しから、訳文で付けるべきアンカーを出力"
+run = "tsx scripts/anchors.ts"
+
+[tasks.typecheck]
+description = "TypeScript の型検査（scripts と .vitepress の .ts）"
+run = "tsc --noEmit"
+
+[tasks.verify]
+description = "原文と訳の構造が 1:1 対応しているか機械的に検証"
+run = "tsx scripts/verify.ts"
+
+[tasks."check:links"]
+description = "リンク切れとアンカー切れを検査"
+run = "tsx scripts/check-links.ts"
+
+[tasks.check]
+description = "公開前の全チェック"
+depends = ["typecheck", "verify", "check:links", "build"]

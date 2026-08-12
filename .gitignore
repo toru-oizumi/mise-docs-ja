@@ -1,0 +1,12 @@
+node_modules/
+src/.vitepress/cache/
+src/.vitepress/dist/
+
+# sync-upstream.ts が生成する作業用の diff。コミットしない
+.sync/
+
+# sync-upstream.ts が本家を clone する先
+.upstream-clone/
+
+.DS_Store
+*.log

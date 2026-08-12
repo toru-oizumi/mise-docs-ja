@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    // scripts/ は tsx で、src/.vitepress/ は vite でバンドルされる。
+    // どちらも拡張子なし import と .ts 拡張子付き import の両方を解決するので
+    // nodenext ではなく preserve（= bundler 解決）に合わせる。
+    "module": "preserve",
+    "lib": ["es2023", "dom"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "types": ["node"]
+  },
+  // .vue は tsc では見られないので typecheck の対象外。
+  // Layout.vue / UnofficialBanner.vue の型は VitePress のビルドが見る。
+  "include": ["scripts/**/*.ts", "src/.vitepress/*.ts"],
+  "exclude": ["node_modules", "src/.vitepress/dist", "src/.vitepress/cache"]
+}

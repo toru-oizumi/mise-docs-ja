@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          version: 2026.8.3
+      - run: npm ci
+
+      # 原文と訳の構造の 1:1 対応。コードブロックの1文字の改変もここで落ちる
+      - run: mise run typecheck
+      - run: mise run verify
+      - run: mise run check:links
+      - run: mise run build

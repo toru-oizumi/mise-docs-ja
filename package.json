@@ -1,0 +1,21 @@
+{
+  "name": "mise-docs-ja",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "mise ドキュメントの非公式日本語訳",
+  "scripts": {
+    "dev": "vitepress dev src",
+    "build": "vitepress build src",
+    "preview": "vitepress preview src"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "mermaid": "^11.16.1",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vitepress": "1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17",
+    "vitepress-plugin-tabs": "^0.9.1"
+  }
+}

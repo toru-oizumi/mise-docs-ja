@@ -1,0 +1,13 @@
+<!-- mise のロゴ・favicon は使わない。公式と誤認されないよう自前の素朴なマークにする。 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="mise ドキュメント日本語訳（非公式）">
+  <rect width="64" height="64" rx="14" fill="#4b6bfb" />
+  <text
+    x="32"
+    y="44"
+    text-anchor="middle"
+    font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+    font-size="30"
+    font-weight="700"
+    fill="#ffffff"
+  >JA</text>
+</svg>
