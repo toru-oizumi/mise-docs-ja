@@ -14,11 +14,8 @@ const configDir = dirname(fileURLToPath(import.meta.url));
 /** 取り込み済み upstream の commit hash。バナーに短縮形で出す */
 const upstreamRef = readFileSync(resolve(configDir, "../../.upstream-ref"), "utf8").trim();
 
-/**
- * この訳サイト自身のリポジトリ。
- * TODO: 公開先を決めたら書き換える。GitHub Pages の base もこれに合わせる。
- */
-const SITE_REPO = "https://github.com/example/mise-docs-ja";
+/** この訳サイト自身のリポジトリ。GitHub Pages の base もこれに合わせる */
+const SITE_REPO = "https://github.com/toru-oizumi/mise-docs-ja";
 
 /** GitHub Pages のプロジェクトサイトはサブパスに載るので base が必要 */
 const base = process.env.DOCS_BASE ?? "/mise-docs-ja/";

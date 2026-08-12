@@ -37,6 +37,8 @@ jobs:
         env:
           DOCS_BASE: /${{ github.event.repository.name }}/
 
+      - run: mise run check:build
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -20,3 +20,4 @@ jobs:
       - run: mise run verify
       - run: mise run check:links
       - run: mise run build
+      - run: mise run check:build

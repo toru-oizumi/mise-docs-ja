@@ -43,6 +43,13 @@ run = "tsx scripts/verify.ts"
 description = "リンク切れとアンカー切れを検査"
 run = "tsx scripts/check-links.ts"
 
+[tasks."check:build"]
+description = "ビルド成果物を検査（バナー・canonical・ブランドの混入）"
+# dist を読むので build の完了が前提。mise は depends を並列に走らせるため、
+# check にまとめて並べるのではなくここで順序を固定する
+depends = ["build"]
+run = "tsx scripts/check-build.ts"
+
 [tasks.check]
 description = "公開前の全チェック"
-depends = ["typecheck", "verify", "check:links", "build"]
+depends = ["typecheck", "verify", "check:links", "check:build"]
