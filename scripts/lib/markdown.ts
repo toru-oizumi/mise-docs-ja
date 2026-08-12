@@ -60,6 +60,12 @@ export type Parsed = {
   links: Link[];
   /** `:::` コンテナの開始行。例: `tip`, `code-group` */
   containers: string[];
+  /**
+   * `:::tabs` 内のタブ見出し（`== ラベル`）。
+   * 同じ `key:` を共有するタブグループはラベルで選択状態を同期するので、
+   * 数が変わるとタブが1つ消えるか、同期が壊れる。
+   */
+  tabLabels: string[];
   /** テーブル行の総数（区切り行を含む） */
   tableRows: number;
   /** 箇条書き・番号付きリストの項目数 */
@@ -74,6 +80,8 @@ const ANCHOR_RE = /\s*\{#([^}]+)\}\s*$/;
 const LINK_RE = /(!?)\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
 const CONTAINER_RE = /^:::+\s*([a-zA-Z-]*)/;
 const LIST_ITEM_RE = /^\s*(?:[-*+]|\d+\.)\s+\S/;
+/** vitepress-plugin-tabs のタブ見出し。`== Linux/macOS` の形 */
+const TAB_LABEL_RE = /^==\s+(.+)$/;
 
 /** 見出しテキストを markdown-it が slugify に渡す平文に落とす */
 export function inlineToPlain(text: string): string {
@@ -100,6 +108,7 @@ export function parse(src: string): Parsed {
     fences: [],
     links: [],
     containers: [],
+    tabLabels: [],
     tableRows: 0,
     listItems: 0,
   };
@@ -155,6 +164,12 @@ export function parse(src: string): Parsed {
     const container = line.match(CONTAINER_RE);
     if (container) {
       if (container[1]) out.containers.push(container[1]);
+      continue;
+    }
+
+    const tab = line.match(TAB_LABEL_RE);
+    if (tab) {
+      out.tabLabels.push(tab[1].trim());
       continue;
     }
 

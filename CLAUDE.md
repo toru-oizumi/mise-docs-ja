@@ -18,6 +18,7 @@
 - **インラインコード（`` ` `` で囲まれた部分）**のうち、コマンド・オプション・パス・環境変数・設定キー・ファイル名・型名。例: `mise use`, `--global`, `~/.config/mise/config.toml`, `MISE_ENV`, `[tools]`, `idiomatic_version_file`
 - **URL**（リンクテキストは訳す、URL は訳さない）
 - **frontmatter のキー名**。`title` の値のみ翻訳し、他のキーと値は触らない
+- **`<Badge text="..." />` などの Vue コンポーネントの属性値**。表示テキストだが、触ると壊れるリスクの方が大きい
 - **VitePress のコンテナ記法のラベル**（`::: tip`, `::: warning`, `::: danger` の `tip`/`warning` 等）。中身の本文は訳す
 
 判断に迷ったら訳さない。原語のままの方が、誤訳より害が小さい。
@@ -33,12 +34,54 @@
 
 ページ内リンク（`[foo](#running-tasks)`）も原文のアンカーをそのまま使う。
 
+### アンカーは自分で考えず、必ず機械生成した値を使う
+
+```
+mise run anchors -- <ファイル>
+```
+
+この出力をそのまま写す。**アンカーを人や LLM が考えると必ず壊れる。** 実測した失敗例:
+
+- 原文 `## Trusting config files` に対し `{#trust}` と意味で縮めた（正解は `{#trusting-config-files}`）
+- 原文 `### What's next?` を `{#whats-next}` と解いた（VitePress の正解は `{#what-s-next}`。`'` はハイフンになる）
+
+規則は2つだけで、どちらも `mise run anchors` が判定する。
+
+1. **原文が `{#foo}` で明示している見出し** → その値をそのまま使う。原文には明示アンカーが付いた見出しが多数ある
+2. **明示していない見出し** → VitePress の `slugify` で導出した値を使う。`.` `'` `?` `(` などの記号もハイフンになる
+
+`mise run verify` がアンカーの一致を検査するので、間違っていれば必ず落ちる。
+
 ## リンクの扱い
 
 - **翻訳済みページへのリンク** → 相対パスのまま維持
 - **未翻訳ページへのリンク** → 原文サイトの絶対 URL（`https://mise.jdx.dev/...`）に書き換え、リンクテキストの末尾に `（原文）` を付ける
 - **外部サイトへのリンク** → そのまま
 - リンクテキストは翻訳する。ただしそれがコマンド名や設定キーの場合は原語のまま
+
+翻訳済みかどうかの判定は `scripts/scope.ts` の `TRANSLATED` が唯一の情報源。自分で覚えようとしない。
+
+`（原文）` は**リンクテキストの内側**に入れる。外に出すとリンクの一部にならず、クリックできない飾りになる。
+
+```markdown
+<!-- 正 -->
+[`mise activate`（原文）](https://mise.jdx.dev/cli/activate)
+
+<!-- 誤 -->
+[`mise activate`](https://mise.jdx.dev/cli/activate)（原文）
+```
+
+**翻訳済みのページを原文サイトに飛ばしてはいけない。** 読者が日本語版から英語版に落ちる。リンク切れより気づきにくいので `mise run verify` が error として検出する。
+
+## タブ見出し（`== ラベル`）
+
+`:::tabs key:foo` を共有するタブグループは、**ラベル名で選択状態を同期する**。同じ `key:` の別グループに同名のラベルがあるとき、片方だけ訳すと同期が壊れる。
+
+- 固有名詞だけのラベル（`== Linux/macOS`, `== Debian/Ubuntu (apt)`, `== Windows`）は原語のまま
+- 説明的なラベル（`== Other package managers`）は訳す
+- **原文で同名だったラベルは、訳文でも同じ訳語にする**
+
+`mise run verify` がタブ見出しの数と、同名ラベルの訳の一貫性を検査する。
 
 ## 訳注
 
@@ -80,11 +123,28 @@
 - frontmatter の `upstreamRef` / `upstreamDate` を更新する
 - **原文スナップショット（`upstream/`）の更新と訳の更新は必ず同一コミットに含める**
 
+## frontmatter
+
+訳文の先頭に必ず付ける。`title` は `scripts/scope.ts` の `TRANSLATED` に書かれた値と一致させる（サイドバーの表示と共有しているため）。
+
+```yaml
+---
+title: タスクの実行
+upstreamPath: docs/tasks/running-tasks.md
+upstreamUrl: https://mise.jdx.dev/tasks/running-tasks.html
+upstreamRef: 1c7db9f9
+upstreamDate: "2026-08-12"
+---
+```
+
+**`upstreamDate` は必ずクォートする。** クォートしないと YAML が Date 型として解釈し、表示が `2026-08-12T00:00:00.000Z` になる。
+
 ## 作業単位
 
 - 1ファイル = 1タスク として扱う。複数ファイルを1回の応答でまとめて訳さない（品質が落ちる）
-- 訳し終えたら、原文と訳を並べて見出し数・コードブロック数・リンク数が一致しているか自己検証する
+- 訳し終えたら **`mise run verify -- <ファイル>` を実行し、error 0 になるまで直す**。自分で数を数えようとしない（実測で、見出し数もコードブロック数もリンク数も間違えた）
 - 大量ファイルを処理する場合は subagent に並列で投げてよいが、**各 subagent に必ず `glossary.md` と本ファイルを読ませる**
+- 翻訳は sonnet 以上を使う。haiku は構造は守れるが、リンク書き換え規則を系統的に落とし、任意の推奨（`you'll probably want to`）を必須（「必要があります」）に変える種類の誤訳を出した
 
 ## やらないこと
 

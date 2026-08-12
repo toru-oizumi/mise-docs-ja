@@ -125,7 +125,7 @@ mise exec -- node my-script.js
 アプローチは2つあります:
 
 - [`mise activate`（原文）](https://mise.jdx.dev/cli/activate) — プロンプトが実行されるたびに `PATH` と環境を更新します。インタラクティブシェルで推奨されます。
-- [shim](dev-tools/shims.md) — コマンドを横取りして正しい環境を読み込むシンボリックリンクです。CI/CD、IDE、スクリプトに適しています。[shim は `mise activate` の全機能をサポートしていません](/dev-tools/shims.html#shims-vs-path)点に注意してください。
+- [shim](dev-tools/shims.md) — コマンドを横取りして正しい環境を読み込むシンボリックリンクです。CI/CD、IDE、スクリプトに適しています。[shim は `mise activate` の全機能をサポートしていない](/dev-tools/shims.html#shims-vs-path) 点に注意してください。
 
 どちらも使わず、直接 `mise exec` や `mise run` を呼び出すこともできます。
 詳細については [このガイド](dev-tools/shims.md) を参照してください。

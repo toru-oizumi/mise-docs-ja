@@ -68,6 +68,14 @@
 | subcommand | サブコマンド | |
 | output | 出力 | |
 | idiomatic version file | idiomatic バージョンファイル | `.node-version` 等。初出時に「idiomatic バージョンファイル（idiomatic version file）」と併記 |
+| interactive shell | インタラクティブシェル | 「対話的シェル」と揺らさない |
+| autocompletion / completion | 自動補完 | 「オートコンプリート」としない |
+| walkthrough | ウォークスルー | |
+| intercept | 横取りする | shim の説明で出る。「インターセプトする」としない |
+| one-off (command) | 単発の（コマンド） | 「ワンオフ」としない |
+| symlink | シンボリックリンク | |
+| rc file | rc ファイル | `~/.zshrc` 等。訳さない |
+| approach | アプローチ | |
 
 ## 訳さないもの（原語のまま）
 
@@ -92,6 +100,9 @@
 | Make sure to ... | 必ず〜してください |
 | We recommend ... | 〜を推奨します |
 | Coming soon | 近日対応予定 |
+| you'll probably want to ... | 〜しておくとよいでしょう（「〜する必要があります」は誤り。任意の推奨を必須に変えてしまう） |
+| Yes / No（テーブルの対応表） | はい / いいえ |
+| Feature（テーブルのヘッダ） | 機能 |
 
 ## 見出しの定型
 

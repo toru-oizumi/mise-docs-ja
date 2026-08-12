@@ -176,6 +176,33 @@ function checkStructure(orig: Parsed, tran: Parsed): Issue[] {
       message: `::: コンテナのラベルが不一致\n      原文: ${oc}\n      訳文: ${tc}`,
     });
   }
+  if (orig.tabLabels.length !== tran.tabLabels.length) {
+    issues.push({
+      level: "error",
+      message:
+        `タブ見出し（== 行）の数が不一致: 原文 ${orig.tabLabels.length} / 訳文 ${tran.tabLabels.length}\n` +
+        `      原文: ${orig.tabLabels.join(" | ")}\n` +
+        `      訳文: ${tran.tabLabels.join(" | ")}`,
+    });
+  } else {
+    // 同じ key: を共有するタブグループは、同名ラベルで選択状態を同期する。
+    // 原文で同名だったラベルが訳文で別名になると同期が壊れる。
+    const groups = new Map<string, Set<string>>();
+    orig.tabLabels.forEach((o, i) => {
+      if (!groups.has(o)) groups.set(o, new Set());
+      groups.get(o)!.add(tran.tabLabels[i]);
+    });
+    for (const [o, translations] of groups) {
+      if (translations.size > 1) {
+        issues.push({
+          level: "error",
+          message:
+            `原文で同名のタブ見出し「${o}」が、訳文で別の訳語になっている` +
+            `（${[...translations].join(" / ")}）。同じ key: のタブ同期が壊れるので訳を揃える`,
+        });
+      }
+    }
+  }
   return issues;
 }
 
@@ -223,6 +250,9 @@ function checkUntranslated(origSrc: string, tranSrc: string): Issue[] {
   const hasJa = /[ぁ-んァ-ヶ一-龠]/;
   for (const [i, line] of strip(tranSrc).entries()) {
     const t = line.trim();
+    // タブ見出しは固有名詞だけのことが多く（`== Debian/Ubuntu (apt)`）、
+    // 原語のままが正しい。訳し残しの検出対象から外す。
+    if (t.startsWith("== ")) continue;
     if (t.length > 40 && !hasJa.test(t) && origParas.has(t)) {
       issues.push({
         level: "warn",
