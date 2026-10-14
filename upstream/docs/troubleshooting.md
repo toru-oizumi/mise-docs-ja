@@ -1,393 +1,407 @@
+---
+description: "Diagnose problems with shell activation, tool versions, downloads, tasks, and Windows setups."
+outline: [2, 3]
+---
+
 # Troubleshooting
 
-If you're looking for help with a specific error message, see [Errors](/errors.html) — this
-page is organized by symptom instead.
+Fix common problems with shell activation, tool versions, downloads, tasks,
+and Windows setups, grouped by symptom. To look up a message that mise printed,
+see [Error messages](/errors.html).
 
-## `mise activate` doesn't work in `~/.profile`, `~/.bash_profile`, `~/.zprofile`
+## Collect diagnostics {#mise-is-failing-or-not-working-right}
 
-`mise activate` should only be used in `rc` files. These are the interactive ones used when
-a real user is using the terminal. (As opposed to being executed by an IDE or something). The prompt
-isn't displayed in non-interactive environments so PATH won't be modified.
-
-For non-interactive setups, consider using shims instead which will route calls to the correct
-directory by looking at `PWD` every time they're executed. You can also call `mise exec` instead of
-expecting things to be directly on PATH. You can also run `mise env` in a non-interactive shell,
-however that
-will only set up the global tools. It won't modify the environment variables when entering into a
-different project.
-
-::: warning
-`mise activate --shims` does not support all the features of `mise activate`.<br>
-See [shims vs path](/dev-tools/shims.html#shims-vs-path) for more info.
-:::
-
-Also see the [shebang](/tips-and-tricks#shebang) example for a way to make scripts call mise to get
-the runtime.
-That is another way to use mise without activation.
-
-## Slow shell prompts {#slow-shell-prompts}
-
-`mise activate` runs a hook on every prompt to check if tools or env vars need updating. This typically takes only a few milliseconds, but if your prompts feel sluggish you can profile it with `MISE_TIMINGS`:
-
-First deactivate mise so the prompt hook doesn't interfere with your measurement, then run `hook-env` manually with timings:
+Run these from the directory where the problem happens:
 
 ```sh
-mise deactivate
-
-# Show timing per major step (color-coded: red = slow)
-MISE_TIMINGS=1 mise hook-env -s bash 2>&1 >/dev/null
-
-# Or use =2 for detailed per-step breakdowns with cumulative time
-MISE_TIMINGS=2 mise hook-env -s bash 2>&1 >/dev/null
+mise --version
+mise doctor        # setup problems, config files, tools, and activation status
+mise doctor path   # the PATH entries mise adds
 ```
 
-Replace `bash` with your shell. Common causes of slow prompts:
+Rerun the failing command with `--verbose`, or with `MISE_DEBUG=1`
+(`MISE_TRACE=1` for more detail). To keep a log, add
+`MISE_LOG_FILE=mise.log MISE_LOG_FILE_LEVEL=debug`. If an install fails
+without a clear cause, `mise install --raw` installs one tool at a time and
+connects the installer to your terminal, which shows prompts and build errors
+that the progress display hides.
 
-- Expensive `_.source` scripts in `mise.toml` — these re-run on every prompt
-- Large numbers of tools or plugins
-- Network-dependent operations in env directives
+For a shell problem, compare the command in your shell with
+`mise exec -- <command>`, which computes the project environment for that one
+command.
 
-Note that [`mise activate --shims`](/dev-tools/shims) moves the cost from every prompt to every tool invocation, which may or may not be faster depending on your workflow. See [Shims vs PATH](/dev-tools/shims.html#shims-vs-path) for tradeoffs.
+Logs, trace output and `mise env` output can contain secrets and private paths,
+so review them before you share them.
 
-## mise is failing or not working right
+Update mise with the package manager that installed it, or with
+`mise self-update`; see [Updating mise](/installing-mise.html#updating). Clear
+the [cache](/cache-behavior.html) when the symptom is stale metadata. Deleting
+mise's data or reinstalling every tool rarely fixes a version-selection or
+shell problem.
 
-First try setting `MISE_DEBUG=1` or `MISE_TRACE=1` and see if that gives you more information.
-You can also set `MISE_LOG_FILE_LEVEL=debug MISE_LOG_FILE=/path/to/logfile` to write logs to a file.
+If the problem remains, open a [GitHub Issue](https://github.com/jdx/mise/issues)
+with the command, your config, OS, shell, mise version, and `mise doctor`
+output. For questions, start a [Discussion](/contact.html).
 
-If something is happening with the activate hook, you can try disabling it and
-calling `eval "$(mise hook-env)"` manually.
-It can also be helpful to use `mise env` which will just output environment variables that would be
-set.
-Also consider using [shims](/dev-tools/shims.md) which can be more compatible.
+## Shell activation and PATH {#shell-activation-and-path}
 
-If runtime installation isn't working right, try using the `--raw` flag which will install things in
-series and connect stdin/stdout/stderr directly to the terminal. If a plugin is trying to interact
-with you for some reason this will make it work.
+### Tools are missing in a login shell, editor, script, or CI {#mise-activate-doesn-t-work-in-profile-bash-profile-zprofile}
 
-Of course check the version of mise with `mise --version` and make sure it is the latest.
-Use `mise self-update`
-to update it. `mise cache clean` can be used to wipe the internal cache and `mise implode` can be
-used
-to remove everything except config.
+<a id="tool-not-found-after-mise-install-or-mise-use-in-a-script"></a>
+<a id="mise-activate-in-ci-non-interactive-shells"></a>
+<a id="mise-isn-t-working-when-calling-from-tmux-or-another-shell-initialization-script"></a>
 
-Lastly, there is `mise doctor` which will show diagnostic information and any warnings about issues
-detected with your setup. If you submit a bug report, please include the output of `mise doctor`.
+`mise activate` applies the environment when it runs, then updates it from a
+hook that runs before each prompt and, in most shells, after each `cd`. A
+process that never runs that hook keeps the environment it started with:
 
-## The wrong version of a tool is being used
+- Login profiles (`~/.profile`, `~/.bash_profile`, `~/.zprofile`) are read
+  only by login shells. Shells and programs started without reading them, such
+  as a subshell or a terminal that opens a non-login shell, inherit the `PATH`
+  but not the hook, so tools stop following you between projects. Put
+  `mise activate` in your interactive startup file (`~/.bashrc`, `~/.zshrc`,
+  `~/.config/fish/config.fish`) and `mise activate --shims` in the profile; see
+  [Add shims to PATH](/dev-tools/shims.html#how-to-add-mise-shims-to-path).
+- Editors and other GUI programs read a login profile at most once, when they
+  start. Put the shims on their `PATH` as above, then restart the editor. See
+  [Editors and IDEs](/ide-integration.html). Shims
+  [do not cover everything activation does](/dev-tools/shims.html#shims-vs-path).
+- Scripts and CI jobs never show a prompt. Run commands with
+  `mise exec -- <command>` or `mise run <task>`, which compute the environment
+  for that command. Keep the script in the project directory so mise finds its
+  config. See [Continuous integration](/continuous-integration.html).
+- Installing a tool in a script does not change that script's `PATH`. Run the
+  next command through `mise exec`:
 
-Likely this means that mise isn't first in PATH—using shims or `mise activate`. You can verify if
-this is the case by calling `which -a`, for example, if node@20.0.0 is being used but mise specifies
-node@26.0.0, first make sure that mise has this version installed and active by running `mise ls node`.
-It should not say missing and have the correct "Requested" version:
+  ```sh
+  mise install
+  mise exec -- node --version
+  ```
 
-```bash
-$ mise ls node
-Plugin  Version  Config Source       Requested
-node    24.0.0  ~/.mise/config.toml  24.0.0
+- In Bash, Zsh, Fish and PowerShell, and in Elvish after `mise:activate`,
+  lines after the activation line in the same startup file already see mise
+  tools. Lines before it, and shells that never read that file, such as the
+  `sh -c` commands that tmux runs from `tmux.conf`, do not. Use
+  `mise exec -- <command>` there, or put the shims on `PATH` first. In Nushell
+  and Xonsh, activation applies the environment at the first prompt. See
+  [Scripts and shell startup files](/dev-tools/shims.html#using-mise-in-rc-files).
+
+`eval "$(mise env -s bash)"` loads the current project's tools and variables
+into a shell once; it does not update when you change directories. A
+standalone script can also name its tool in a [shebang](/tips-and-tricks.html#shebang).
+
+### Creating `~/.bash_profile` stopped `~/.profile` from loading {#creating-bash-profile-breaks-existing-profile-on-ubuntu-debian}
+
+A login Bash reads only the first of `~/.bash_profile`, `~/.bash_login` and
+`~/.profile` that exists. Ubuntu and Debian keep `PATH` setup in `~/.profile`,
+so a new `~/.bash_profile` hides it, whether you created the file by hand, for
+[shims](/dev-tools/shims.html#how-to-add-mise-shims-to-path), or with
+`bash = true` in [`[bootstrap.mise_shell_activate]`](/bootstrap/shell.html).
+Load `~/.profile` from the new file:
+
+```sh [~/.bash_profile]
+[[ -f ~/.profile ]] && source ~/.profile
 ```
 
-If `node -v` isn't showing the right version, make sure mise is activated by running `mise doctor`.
-It should not have a "problem" listed about mise not being activated. Lastly, run `which -a node`.
-If the directory listed is not a mise directory, then mise is not first in PATH. Whichever node is
-being run first needs to have its directory set before mise is. Typically this means setting PATH for
-mise shims at the end of bashrc/zshrc.
+### The wrong version of a tool runs {#the-wrong-version-of-a-tool-is-being-used}
 
-If using `mise activate`, you have another option of enabling `MISE_ACTIVATE_AGGRESSIVE=1` which will
-have mise always prepend its tools to be first in PATH. If you're using something that also modifies
-paths dynamically like `mise activate` does, this may not work because the other tool may be modifying
-PATH after mise does.
+Compare what the project selects with what your shell runs. For Node.js:
 
-If nothing else, you can run things with [`mise x --`](/cli/exec) to ensure that the correct version is being used.
+```sh
+mise ls --current node       # the version and the config file that selects it
+mise which node              # the executable mise would run
+mise exec -- node --version  # the version mise runs
+node --version               # the version your shell runs
+type -a node                 # every node your shell can find, in order
+mise doctor path             # the PATH entries mise adds
+```
 
-## New version of a tool is not available
+If `mise ls` shows the version as missing, run `mise install`. If it shows the
+wrong request or config file, check the current directory, the selected
+[config environment](/configuration/environments.html), and
+[how config files combine](/configuration.html#configuration-hierarchy). See
+[How a request resolves](/dev-tools/versions.html#how-requests-resolve) for
+how mise picks among installed versions.
 
-There are 2 places that versions are cached so a brand new release might not appear right away.
+If `mise exec` runs the expected version but `node` does not, `type -a node`
+shows the alias, function, or executable that comes first. Remove activation
+for other version managers, and put `mise activate` after anything that edits
+`PATH` in your startup file, such as a Zinit or Oh My Zsh plugin. Open a new
+shell after editing it.
+[`activate_aggressive`](/configuration/settings.html#activate_aggressive) keeps
+tool directories ahead of `PATH` entries added after activation, such as a later
+line in your startup file. A prompt hook that runs after mise's can still
+change the order at each prompt; move that hook before `mise activate`, or use
+`mise exec -- <command>`. For a problem that happens only in an editor, see
+[Editors and IDEs](/ide-integration.html).
 
-The first is that the mise CLI caches versions for. The cache can be cleared with `mise cache clear`.
+### Shell prompts are slow {#slow-shell-prompts}
 
-The second uses the <https://mise-versions.jdx.dev> host as a centralized
-place to list all of the versions of most plugins. This is intended to speed up mise and also
-get around GitHub rate limits when querying for new versions. Check that repo for your plugin to
-see if it has an updated version. This service can be disabled by
-setting `MISE_USE_VERSIONS_HOST=0`.
+`mise activate` runs a hook at every prompt. It returns early when nothing
+relevant changed, so the cost is usually a few milliseconds. To time one full
+environment calculation:
 
-mise also uses the versions host as a shared cache for public GitHub release metadata and
-GitHub artifact attestations. This means normal installs of public `github:` and many
-`aqua:` tools can avoid unauthenticated GitHub API calls even in Docker builds or CI jobs
-that do not have a token configured. If the versions host does not have the requested
-metadata yet, mise falls back to GitHub's API.
+```sh
+MISE_TIMINGS=1 mise hook-env --force -s bash >/dev/null  # time per step
+MISE_TIMINGS=2 mise hook-env --force -s bash >/dev/null  # with sub-steps
+```
 
-mise-versions itself also struggles with rate limits but you can help it to fetch more frequently by authenticating
-with its [GitHub app](https://github.com/apps/mise-versions). It does not require any permissions since it simply
-fetches public repository information. The more people do this, the quicker
-mise will be able to fetch new versions of tools.
+Replace `bash` with your shell. `--force` skips the early-exit check, so the
+command measures the whole calculation without changing your session. The
+usual causes of a slow calculation are:
 
-## Windows problems
+- `_.source` scripts that run when the environment needs recomputing
+- many tools or environment plugins
+- env directives or templates that make network requests
 
-::: warning
-Very basic support for windows is currently available, however because Windows can't support asdf
-plugins, they must use core and vfox only—which means only a handful of tools are available on
-Windows.
-:::
+[Environment caching](/cache-behavior.html#environment-caching) and
+`watch_files` reduce repeated work for environment plugins. On slow
+filesystems such as NFS,
+[`hook_env.chpwd_only`](/configuration/settings.html#hook_env.chpwd_only)
+checks config only when you change directories, and
+[`hook_env.cache_ttl`](/configuration/settings.html#hook_env.cache_ttl) caches
+those checks.
 
-### Path limits
+[`mise activate --shims`](/dev-tools/shims.html) moves the cost from every
+prompt to every tool call, which is faster or slower depending on how often you
+run tools. See [Performance](/dev-tools/shims.html#performance).
 
-If you have many tools defined in your `mise.toml` hierarchy, then it is possible that `mise x` will produce a `Path` environment variable that is too long for certain tools to handle, most notably, `cmd.exe`. This will affect `mise` tools that invoke `cmd.exe` (like `npm install`).
+## Versions and downloads {#versions-and-downloads}
 
-The limit is **8191 characters**, and `cmd.exe` does not truncate a longer `Path` — it [ignores the variable entirely](https://learn.microsoft.com/en-us/troubleshoot/windows-client/shell-experience/command-line-string-limitation). So the symptom is not that one tool goes missing: everything that was found through `Path` stops resolving at once and reports `is not recognized`. Programs in `C:\Windows\System32` keep working, because `cmd.exe` finds those without consulting `Path` — which is what makes the failure look arbitrary, and why the test below matters.
+### A new release is not listed {#new-version-of-a-tool-is-not-available}
 
-You have a few options:
+Three things can hide a release from the last day:
 
-1. Set the `MISE_INSTALLS_DIR` environment variable to a shorter location, e.g. `C:\.mise-installs`.
-1. Use `powershell.exe` or `pwsh.exe` instead of `cmd.exe`, since they can handle a longer `Path`.
-1. Re-organise the `mise.toml` files in your monorepo, to specify only the tools they need.
-1. [Shims](/dev-tools/shims.html) keep your **shell's** `Path` from growing with your toolset — `mise activate --shims` adds one directory rather than one per tool. Be aware of what this does not cover: running a tool through a shim still builds an environment containing every active tool's directory, so a mise-managed tool that itself invokes `cmd.exe` (like `npm`) sees the same long `Path` either way. Shims also [do not support all the features](/dev-tools/shims.html#shims-vs-path) of `mise activate`.
+- The [minimum release age](/security.html#minimum-release-age). For most
+  backends, mise does not list a release, or pick it for a prefix or `latest`,
+  until it is 24 hours old. `mise ls-remote` then warns
+  `1 newer node release hidden by minimum_release_age`. To install the release
+  now, name the exact version, such as `mise use node@24.11.1`. A prefix whose
+  matching releases are all hidden, such as `node@24.12` in the day after
+  24.12.0 comes out, fails with a [404](/errors.html#http-404).
+- mise's cached copy of the version list. See
+  [When mise refreshes version lists](/cache-behavior.html#version-list-refresh)
+  for which commands use the cache.
+- The [mise-versions](https://mise-versions.jdx.dev) host, which serves most
+  tools' version lists and checks upstream on a schedule.
 
-You can run the following command to test whether you have hit the `cmd.exe` `Path` limitation:
+To see every release the backend has, clear the cache for the tool, then skip
+the versions host and the age filter:
+
+```sh
+mise cache clear node
+mise ls-remote --no-versions-host --minimum-release-age 0s node
+```
+
+Without the versions host, mise may need the backend's credentials, such as a
+[GitHub token](/dev-tools/github-tokens.html). The
+[`use_versions_host`](/configuration/settings.html#use_versions_host) setting
+turns the host off for every command.
+
+The versions host is rate-limited by GitHub too. Authorizing the
+[mise-versions GitHub app](https://github.com/apps/mise-versions), which
+requests no permissions, gives it more API quota, so new releases appear
+sooner.
+
+### Downloads fail with 403 Forbidden {#_403-forbidden-when-installing-a-tool}
+
+A 403 from GitHub is usually a rate limit, especially in CI. See
+[`HTTP status client error (403 Forbidden)`](/errors.html#http-403).
+
+### Typing a missing command does not install it {#auto-install-on-command-not-found-does-not-trigger}
+
+When you type a command that is not found, mise can install the configured
+tool that provides it
+([`not_found_auto_install`](/configuration/settings.html#not_found_auto_install)).
+It finds the tool from the registry's list of each tool's commands, so it also
+covers a configured tool that has never been installed. Nothing happens when:
+
+- mise is not activated with `mise activate` in Bash, Zsh, Fish, or PowerShell.
+  Other shells have no command-not-found hook, and shims exist only for the
+  commands of tools that are already installed.
+- The tool is configured with a backend identifier such as `"cargo:some-crate"`
+  or `"github:owner/repo"` rather than a registry name such as `ripgrep`.
+  Backend identifiers carry no command list, so use the registry name where one
+  exists.
+- The tool is not in your config. Set
+  [`not_found_auto_install_registry`](/configuration/settings.html#not_found_auto_install_registry)
+  to install a tool that exactly one registry entry provides; mise adds it to
+  your global config.
+- [`auto_install`](/configuration/settings.html#auto_install) or
+  `not_found_auto_install` is `false`, or the tool is listed in
+  [`auto_install_disable_tools`](/configuration/settings.html#auto_install_disable_tools).
+
+For a tool with a backend identifier, mark it `lazy = true` and list its
+commands in `lazy_bins`. mise then creates shims that install it the first time
+one of its commands runs; see [Lazy tools](/dev-tools/shims.html#lazy-tools):
+
+```toml [mise.toml]
+[tools]
+"github:owner/repo" = { version = "1.2.3", lazy = true, lazy_bins = ["tool"] }
+```
+
+Otherwise, run `mise install`, or [`mise exec`](/cli/exec.html), which installs
+missing tools before it runs the command. Both skip tools marked `lazy = true`
+until their commands run; `mise install --include-lazy` installs those too.
+Once any version of a tool is installed, mise also finds its commands in that
+installation, so the handler can install other versions the project asks for
+later.
+
+## Tasks {#tasks}
+
+### Secrets are not redacted in raw task output {#tasks-with-redact-env-vars-break-raw-output}
+
+Tasks with [`raw = true`](/tasks/task-configuration.html#raw) or
+[`interactive = true`](/tasks/task-configuration.html#interactive), and runs
+with `--raw`, write straight to your terminal, so mise cannot mask
+[redacted](/environments/secrets/#redaction) values in their output. It prints a
+hint when this applies. Leave `raw` off for tasks whose output may contain
+secrets. See [What redaction covers](/environments/secrets/#what-redaction-covers).
+
+For tasks that run in the wrong order or that mise does not find, see
+[Dependencies and execution order](/tasks/architecture.html) and
+[`no task <name> found`](/errors.html#task-not-found).
+
+## Windows {#windows-problems}
+
+For which tools and backends work on Windows, see
+[Does mise work on Windows?](/faq.html#windows-support)
+
+### `cmd.exe` stops finding programs: PATH too long {#path-limits}
+
+mise warns when a `PATH` it builds is longer than `cmd.exe` accepts:
+
+```text
+mise WARN  PATH is 9120 characters, longer than the 8191 cmd.exe accepts. ...
+```
+
+`cmd.exe` does not truncate a longer `PATH`; it
+[ignores the variable entirely](https://learn.microsoft.com/en-us/troubleshoot/windows-client/shell-experience/command-line-string-limitation).
+Everything it would find through `PATH` then fails with `is not recognized`,
+while programs in `C:\Windows\System32` keep working. Tools that run through
+`cmd.exe`, such as `npm`, `npx` and batch scripts, are affected.
+
+To shorten `PATH`:
+
+1. Set `MISE_INSTALLS_DIR` to a short directory, such as `C:\.mise-installs`.
+2. Declare tools only in the `mise.toml` files that need them. In a monorepo,
+   move tools out of the root config.
+3. Run commands from PowerShell, which accepts a longer `PATH`.
+
+mise already drops exact duplicates from the `PATH` it gives `mise exec`,
+`mise run`, and `mise env`, so the length comes from distinct directories.
+[Shims](/dev-tools/shims.html) keep your own shell's `PATH` short, but a tool
+started through a shim still gets every active tool's directory, so a tool that
+calls `cmd.exe` sees the same long `PATH`.
+
+To confirm, run a program that is not in `C:\Windows\System32` through
+`cmd.exe`, from a directory that does not contain it. `cmd.exe` finds programs
+in those two places without reading `PATH`:
 
 ```powershell
-# Path is within limits
-❯ mise x -- cmd.exe /d /s /c "git --version"
-git version 2.55.0.windows.3
-# Path exceeds cmd.exe limits
-❯ mise x -- cmd.exe /d /s /c "git --version"
-'git' is not recognized as an internal or external command,
-operable program or batch file.
-mise ERROR command failed: exit code 1
-mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information
+mise exec -- cmd.exe /d /s /c "git --version"
 ```
 
-Two things to get right about that test. Pick a program that is **not** in `C:\Windows\System32` and not in the directory you run the test from: `cmd.exe` searches the current directory before `Path`, and finds system-directory programs without consulting `Path` at all, so a probe in either place succeeds however long `Path` is. That is exactly why `where.exe` tells you nothing. Then check that your chosen program runs normally first (`git --version` in your shell), since a program you simply do not have produces the same `is not recognized` that the limit does.
+If `git --version` works in your shell but this prints
+`'git' is not recognized as an internal or external command`, `PATH` is over
+the limit.
 
-Duplicate `Path` entries are less of a factor than they used to be: on reactivation mise now drops the stale install directories it finds on the inherited `Path` before adding the current toolset's (v2026.5.18), and it collapses exact duplicates in the environments it computes (`mise x`, `mise run`, `mise env`, `mise doctor`) as of v2026.7.18. That lowers what mise contributes, but it does not raise the ceiling — enough distinct tools will still reach 8191.
+### An editor reports `spawn EINVAL` {#vscode-for-windows-extension-with-error-spawn-einval}
 
-### Shims leaking into WSL
+An editor extension that starts a `.cmd` shim directly fails with
+`spawn EINVAL` since a
+[Node.js security fix](https://nodejs.org/en/blog/vulnerability/april-2024-security-releases-2#command-injection-via-args-parameter-of-child_processspawn-without-shell-option-enabled-on-windows-cve-2024-27980---high).
+Use the default
+[`windows_shim_mode = "exe"`](/configuration/settings.html#windows_shim_mode),
+run `mise reshim`, and restart the extension or language server. If the
+extension still starts a `.cmd` path, change its tool-path setting to the
+`.exe` shim in `%LOCALAPPDATA%\mise\shims`, or to the path that
+`mise which <tool>` prints.
 
-When `windows_shim_mode` is set to `file`, mise writes an extension-less bash
-script next to each `<tool>.cmd` shim (so Git Bash / Cygwin can resolve the
-tool). WSL's default Windows-PATH interop exposes the shims directory at
-`/mnt/c/...`, where every file is treated as executable, so running a shimmed
-tool inside WSL executes that script natively. mise guards the generated script:
-when it detects WSL it drops the shims directory from `PATH` and runs a native
-Linux tool if one is installed, otherwise it fails with a plain `<tool>: not
-found` rather than recursing endlessly or erroring with `mise: not found`.
+### A `bash -c` task fails with `command not found` from PowerShell {#shell-bash-c-task-fails-with-command-not-found-from-powershell}
 
-The default `exe` mode is not affected: it writes only native `<tool>.exe`
-files, which WSL ignores, so nothing leaks into Linux.
-
-To keep the Windows shims out of WSL entirely, either install/manage the tool
-with mise inside WSL, or disable the Windows-PATH interop in `/etc/wsl.conf`:
-
-```ini
-[interop]
-appendWindowsPath = false
-```
-
-### `shell = "bash -c"` task fails with `command not found` from PowerShell
-
-If a task pinned to `shell = "bash -c"` works from Git Bash but fails with
-`command not found` from PowerShell, mise is most likely resolving `bash` to
-the WSL launcher at `C:\Windows\System32\bash.exe` instead of a real POSIX
-bash. The launcher dispatches into the WSL distribution's Linux user-space,
-where mise-managed Windows tools aren't visible.
-
-mise prefers a real POSIX bash (Git Bash / MSYS2) automatically when it can
-find one in a standard install location. If yours is installed elsewhere, set
-`MISE_BASH_PATH` to override:
+A task with `shell = "bash -c"` needs a POSIX bash such as Git Bash or MSYS2.
+From PowerShell, the first `bash` on `PATH` is often the WSL launcher,
+`C:\Windows\System32\bash.exe`, which runs the command inside Linux, where
+mise's Windows tools are not visible. mise skips the WSL launcher and uses Git
+Bash or MSYS2 from their standard install locations or from `PATH`. When it
+finds neither, it warns
+`no real POSIX bash found on PATH (only the WSL launcher)`. Install Git for
+Windows or MSYS2, or point `MISE_BASH_PATH` at a bash:
 
 ```powershell
 $env:MISE_BASH_PATH = "C:\tools\msys64\usr\bin\bash.exe"
 mise run my-bash-task
 ```
 
-```toml
-# Alternatively, scope it to one project from mise.toml
+To set it for one project, put it in `mise.toml`:
+
+```toml [mise.toml]
 [env]
 MISE_BASH_PATH = "C:/tools/msys64/usr/bin/bash.exe"
 ```
 
-mise honors an **explicit** bash path as-is. If you set `shell` (in a task) or
-`windows_default_inline_shell_args` to an absolute path such as
-`C:/msys64/usr/bin/bash.exe -c`, mise uses exactly that binary — the
-`MISE_BASH_PATH` override and the Git Bash / MSYS2 auto-detection apply only
-when the shell is the bare name `bash`.
+`MISE_BASH_PATH` and the detection apply only when the shell is the bare name
+`bash`. If a task's `shell` or
+[`windows_default_inline_shell_args`](/configuration/settings.html#windows_default_inline_shell_args)
+names a path, such as `C:/msys64/usr/bin/bash.exe -c`, mise runs that binary.
+The same rules choose the bash that runs
+[`_.source`](/environments/#env-source) scripts.
 
-The same resolution (auto-detection, `MISE_BASH_PATH`, never the WSL launcher)
-also applies to the bash mise spawns to source
-[`[env] _.source`](/environments/#env-source) scripts.
+Quote a path that contains spaces. On Windows, backslashes in `shell` are
+literal and forward slashes also work; on macOS and Linux, `shell` follows
+POSIX quoting rules:
 
-If your shell path contains spaces (e.g. `C:\Program Files\Git\bin\bash.exe`),
-wrap the program in double quotes so the space is not treated as an argument
-separator. On Windows, backslashes are treated literally, so they need no
-escaping; forward slashes work too:
-
-```toml
+```toml [mise.toml]
 [tasks.build]
 run = "echo hi"
 shell = '"C:\Program Files\Git\bin\bash.exe" -c'
 ```
 
-(On macOS/Linux, `shell` follows POSIX quoting rules instead.)
+### Git Bash, MSYS2, and Cygwin {#cygwin}
 
-#### Cygwin
+Native Windows mise can activate Bash, Zsh and Fish running under Git Bash,
+MSYS2, or Cygwin. Run `mise activate` from that shell's own startup file, as
+shown in [Shell setup](/shell-setup.html#windows): mise detects the runtime when
+the line runs and writes `PATH` in the form that runtime expects. A script
+generated in PowerShell and sourced later in another shell does not work.
 
-mise also detects Cygwin bash (by a `cygwin` / `cygwin64` / `cygwin32` segment in its path) and
-converts PATH using Cygwin's `/cygdrive/c/...` form instead of Git Bash's `/c/...`,
-so binaries on PATH resolve correctly. Point `MISE_BASH_PATH` at your Cygwin bash so
-the intended one is used:
+If directories on `PATH` use custom mount points, declare them in the runtime's
+`/etc/fstab` or `/etc/fstab.d`. mise converts paths with the runtime's default
+mounts and those files only, so mounts made with `mount` in the current session
+and symlinked directories are not converted. Restart the shell after changing
+mounts.
+
+For tasks with `shell = "bash -c"`, set `MISE_BASH_PATH` to choose Cygwin's
+bash:
 
 ```powershell
 $env:MISE_BASH_PATH = "C:\cygwin64\bin\bash.exe"
 ```
 
-#### Custom `cygdrive` mount root (Cygwin **and** Git Bash / MSYS2)
+mise passes `PATH` to these shells unchanged, and they convert it in both
+directions, so `PATH` needs no setup. Other arguments differ: when Git Bash or
+MSYS2 starts a native program, it rewrites arguments and environment variables
+that look like POSIX paths (`/c` becomes `C:/`), and Cygwin does not. Prefix a
+command with `MSYS_NO_PATHCONV=1` to turn that off for one command.
 
-The `cygdrive` automount mechanism is shared by Cygwin and MSYS2 / Git Bash — both let
-you change the mount root in `/etc/fstab` (Cygwin's default is `/cygdrive`, Git Bash /
-MSYS2's is `/`, i.e. `/c/...`). mise does not read `/etc/fstab`, so if you changed it,
-set `MISE_CYGDRIVE_PREFIX` to match — this works for **either** shell:
+### Windows tools run inside WSL {#shims-leaking-into-wsl}
 
-```powershell
-# e.g. for an fstab that mounts drives under /mnt
-$env:MISE_CYGDRIVE_PREFIX = "/mnt"
+WSL adds the Windows `PATH` to Linux by default. With
+[`windows_shim_mode = "file"`](/configuration/settings.html#windows_shim_mode),
+mise writes an extensionless bash script beside each `.cmd` shim, and a command
+typed in WSL can find it under `/mnt/c`. The script detects WSL, removes its
+own directory from `PATH`, and runs the Linux tool if one is installed;
+otherwise it fails with `<tool>: not found`. The default `exe` mode writes only
+`<tool>.exe` files, which a command named `<tool>` in WSL does not match.
+
+Install the Linux build of mise inside WSL to manage Linux tools there. To keep
+Windows paths out of WSL entirely, add this to `/etc/wsl.conf`, run
+`wsl --shutdown` from PowerShell, and reopen WSL:
+
+```ini [/etc/wsl.conf]
+[interop]
+appendWindowsPath = false
 ```
 
-The prefix must be absolute (start with `/`); a relative value like `mnt` is rejected
-with a warning and the shell's default is used instead. `MISE_CYGDRIVE_PREFIX=/`
-collapses to the Git Bash `/c/...` form.
-
-## mise isn't working when calling from tmux or another shell initialization script
-
-`mise activate` will not update PATH until the shell prompt is displayed. So if you need to access a
-tool provided by mise before the prompt is displayed you can either
-[add the shims to your PATH](/dev-tools/shims.html#how-to-add-mise-shims-to-path) e.g.
-
-```bash
-export PATH="$HOME/.local/share/mise/shims:$PATH"
-python --version # will work after adding shims to PATH
-```
-
-Or you can manually call `hook-env`:
-
-```bash
-eval "$(mise activate bash)"
-eval "$(mise hook-env)"
-python --version # will work only after calling hook-env explicitly
-```
-
-For more information, see [What does `mise activate` do?](/faq#what-does-mise-activate-do)
-
-## Is mise secure?
-
-Providing a secure supply chain is incredibly important. mise already provides a more secure
-experience when compared to asdf. Security-oriented evaluations and contributions are welcome.
-We also urge users to look after the plugins they use, and urge plugin authors to look after
-the users they serve.
-
-For more details see [SECURITY.md](https://github.com/jdx/mise/blob/main/SECURITY.md).
-
-## 403 Forbidden when installing a tool
-
-You may get an error like one of the following:
-
-```text
-HTTP status client error (403 Forbidden) for url
-403 API rate limit exceeded for
-```
-
-This can happen if the tool is hosted on GitHub, and you've hit the API rate limit. This is especially
-common running mise in a CI environment like GitHub Actions.
-
-By default, mise uses <https://mise-versions.jdx.dev> to avoid most public GitHub API calls
-for release metadata and artifact attestation checks. If you still see this error, it usually
-means the metadata was not available from the versions host yet, `MISE_USE_VERSIONS_HOST=0`
-is set, the tool uses a private repository, or the tool uses GitHub Enterprise/custom API
-settings.
-
-See [GitHub Tokens](/dev-tools/github-tokens.html) for how to configure authentication and avoid rate limits.
-
-## Tool not found after `mise install` or `mise use` in a script
-
-If you run `mise use` or `mise install` inside a script and then immediately try to use the
-tool, it may not be found. This is because `mise activate` updates PATH at the next prompt,
-which never happens in a script.
-
-**Solutions:**
-
-```bash
-# Option 1: Use mise exec (recommended)
-mise install
-mise exec -- my-tool --version
-
-# Option 2: Re-evaluate the environment after install
-mise install
-eval "$(mise hook-env)"
-my-tool --version
-
-# Option 3: Use shims (they always resolve dynamically)
-export PATH="$HOME/.local/share/mise/shims:$PATH"
-mise install
-my-tool --version
-```
-
-## Creating `~/.bash_profile` breaks existing `~/.profile` on Ubuntu/Debian
-
-On many Linux distributions, `~/.profile` sources `~/.bashrc` and sets up your environment.
-However, if `~/.bash_profile` exists, bash reads that **instead of** `~/.profile`.
-
-If you followed setup instructions that created `~/.bash_profile` for mise, your existing
-`~/.profile` configuration (including PATH, environment variables, etc.) may stop loading.
-
-**Fix:** Add mise activation to `~/.bashrc` instead, or source `~/.profile` from your
-`~/.bash_profile`:
-
-```bash
-# ~/.bash_profile
-[[ -f ~/.profile ]] && source ~/.profile
-```
-
-## Tasks with `redact` env vars break `raw` output
-
-If you have `redact = true` on any env var in your config, tasks with `raw = true` will appear
-to produce no output. This is because mise intercepts stdout/stderr to perform redaction, which
-conflicts with raw mode.
-
-**Workaround**: Remove `redact` from env vars that don't need it, or accept that raw tasks
-won't produce visible output when redactions are active.
-
-## `mise activate` in CI / non-interactive shells
-
-`mise activate` hooks into the shell prompt to update PATH, so historically it didn't work
-in non-interactive shells. With the addition of `chpwd` support, it does work in more
-situations now, but we still recommend these approaches for CI and scripts:
-
-```bash
-# Option 1: Use shims (recommended for CI)
-export PATH="$HOME/.local/share/mise/shims:$PATH"
-# In GitHub Actions, use: echo "$HOME/.local/share/mise/shims" >> $GITHUB_PATH
-
-# Option 2: Use mise exec
-mise exec -- npm test
-
-# Option 3: Manually call hook-env after activate
-eval "$(mise activate bash)"
-eval "$(mise hook-env)"
-```
-
-See also the [CI/CD section](/tips-and-tricks.html#ci-cd) in Tips & Tricks.
-
-## Auto-install on command not found does not trigger
-
-When you run a command that is not found, mise can install the tool that provides it (the [`not_found_auto_install`](/configuration/settings.html#not_found_auto_install) feature). It maps the command back to a tool using the `bins` metadata in mise's registry, which means a tool that is configured but has never been installed is handled too — not only a missing version of a tool you already have.
-
-If nothing happens, it is usually one of these:
-
-- **The tool is configured by a raw backend spec.** `"cargo:some-crate" = "1.0.0"` or `"ubi:owner/repo" = "1.0.0"` is not a registry entry, so it carries no bin metadata and nothing connects the command you typed to it.
-- **The tool is not configured at all.** The handler only installs tools your config already asks for in the current directory; it will not pick a tool for a command you have never declared.
-- **The feature is off for that tool** — either [`not_found_auto_install`](/configuration/settings.html#not_found_auto_install) is `false`, or the tool is listed in [`auto_install_disable_tools`](/configuration/settings.html#auto_install_disable_tools).
-
-**Workarounds:**
-
-- Where a registry entry exists, refer to the tool by its registry name (`ripgrep`) rather than by a raw backend spec (`ubi:BurntSushi/ripgrep`), so the handler can map the command to it.
-- Otherwise install it explicitly instead of on demand: `mise install`, or [`mise x|exec`](/cli/exec) to install and then run something in one step. Both materialise the whole configured toolset, so the backend does not matter. [`mise r|run`](/cli/run) does the same, but only as part of running a task.
-- Installing once by hand is enough to make the handler work from then on: with a version present, mise can also discover the mapping from the installed executables.
+`wsl --shutdown` stops every running WSL distribution, so save your work first.

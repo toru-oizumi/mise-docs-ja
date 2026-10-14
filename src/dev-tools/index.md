@@ -1,434 +1,333 @@
 ---
 title: 開発ツールの概要
+description: "Install tools such as Node.js and Python, pick their versions per project, and upgrade or remove them."
 upstreamPath: docs/dev-tools/index.md
 upstreamUrl: https://mise.jdx.dev/dev-tools/
-upstreamRef: 1c7db9f9
-upstreamDate: "2026-08-12"
+upstreamRef: 5749c813
+upstreamDate: "2026-10-13"
 ---
 
 # 開発ツールの概要 {#dev-tools}
 
-> _mise を使うと、node、python、cmake、terraform、そして[他多数（原文）](https://mise.jdx.dev/registry.html)の開発ツールを、同じプロジェクト設定からインストールし、切り替えられます。_
+mise は Node.js、Python、Go などのツールをインストールし、プロジェクトごとにそのバージョンを選択します。プロジェクトが使うバージョンを `mise.toml` で宣言すると、そのディレクトリで作業している間、mise がそれらを `PATH` に追加します。
 
-`mise` は、ローカル開発向けにプログラミング言語のランタイムやその他のツールのインストールを管理するツールです。例えば、同じマシン上で Node.js、Python、Ruby、Go などの複数バージョンを管理するために使えます。
+## プロジェクトにツールを追加する {#add-a-tool-to-a-project}
 
-[有効化](/getting-started.html#activate-mise)すると、mise はディレクトリに応じてツールの異なるバージョンを自動的に切り替えられます。
-つまり、Node.js 18 を必要とするプロジェクトと Node.js 22 を必要とする別のプロジェクトがある場合、2つのプロジェクト間を移動するたびに mise が自動的に切り替えます。mise で利用可能なツールは[レジストリ（原文）](https://mise.jdx.dev/registry.html)で確認できます。
+プロジェクトのディレクトリで次を実行します。
 
-使用するツールのバージョンを知るために、mise は通常、現在のディレクトリとその親ディレクトリにある `mise.toml` ファイルを探します。ツールがどのように指定されるかを把握するために、[mise.toml](/configuration.html) ファイルの例を示します。
+```sh
+mise use node@24 python@3.14
+```
+
+これにより両方のツールがインストールされ、バージョン指定がプロジェクトの設定に記録されます。
 
 ```toml [mise.toml]
 [tools]
-node = '24'
-python = '3'
-ruby = 'latest'
+node = "24"
+python = "3.14"
 ```
 
-asdf の
-`.tool-versions` ファイルとの互換性もあり、`.node-version` や
-`.ruby-version` のような[idiomatic バージョンファイル（idiomatic version file）](/configuration#idiomatic-version-files)にも対応しています。詳細は[設定](/configuration)を参照してください。
+それらのツールを使ってコマンドを実行します。
 
-ツールのバージョンやツールオプションを指定する際には、設定の階層で定義された環境変数や
-[`vars`（原文）](https://mise.jdx.dev/tasks/task-configuration.html#vars)を参照することもできます。これには `_.source`、`_.file`、env
-モジュールなどのディレクティブによって生成される値も含まれます。これらは、ツールのバージョンとオプションのテンプレートがレンダリングされる前に解決されます。
+```sh
+mise exec -- node --version
+# v24.x.x
+```
 
-::: info
-mise は asdf の `.tool-versions` ファイルと互換性があり、必要に応じて asdf の
-プラグインも使用できます。asdf から移行する場合は、
-[比較ガイド](/dev-tools/comparison-to-asdf)を参照してください。
+[シェルの有効化（原文）](https://mise.jdx.dev/shell-setup.html)を行えば `node --version` を直接実行でき、プロジェクト間を移動するたびに mise がバージョンを切り替えます。リポジトリをクローンした後や、その `mise.toml` を編集した後は、`mise install` を実行して宣言されたツールをインストールしてください。
+
+## よく使うコマンド {#choose-the-right-command}
+
+| 目的                                   | コマンド                              |
+| -------------------------------------- | ------------------------------------- |
+| プロジェクトのツールのバージョンを追加・変更する | `mise use node@24`                    |
+| 個人のデフォルトを設定する             | `mise use --global node@24`           |
+| プロジェクトが宣言するツールをインストールする | `mise install`                        |
+| タスクが必要とするツールもインストールする | `mise install --include-task-tools`   |
+| 保存せずにあるバージョンを1回だけ実行する | `mise exec node@24 -- node --version` |
+| このディレクトリが使うツールを表示する | `mise ls --current`                   |
+| インストール可能なバージョンを一覧表示する | `mise ls-remote node`                 |
+| コマンドが実行する実行ファイルを表示する | `mise which node`                     |
+| 新しいバージョンがあるツールを表示する | `mise outdated`                       |
+| 設定された指定の範囲内でアップグレードする | `mise upgrade node`                   |
+| アップグレードして指定を書き換える     | `mise upgrade --bump node`            |
+| プロジェクトからツールを削除する       | `mise unuse node`                     |
+| インストール済みのバージョンを削除する | `mise uninstall node@22`              |
+
+[`mise use`（原文）](https://mise.jdx.dev/cli/use.html) はバージョンをインストールし、その指定をプロジェクトの `mise.toml` に書き込みます。`--pin` を付けると代わりに解決後のバージョンを書き込み、`--global` を付けると個人のデフォルトを `~/.config/mise/config.toml` に書き込み、`--path` を付けると書き込むファイルを選べます。詳細は[mise が書き込むファイル](/configuration.html#target-file-for-write-operations)を参照してください。`mise use` は自身が実行されたシェルを変更できません。有効化している場合は次のプロンプトで変更が反映され、`mise exec` とタスクは毎回設定を読み込みます。
+
+[`mise install`（原文）](https://mise.jdx.dev/cli/install.html) は設定を一切変更せずにツールをインストールします。
+
+- `mise install node@24.11.1` はそのバージョンをインストールします。
+- `mise install node@24` は 24.x の最新リリースをインストールします。
+- `mise install node` は設定が選択するバージョンをインストールします。
+- `mise install` は、[`lazy = true`](/dev-tools/shims.html#lazy-tools) が指定されたツールを除く、設定されたすべてのツールをインストールします。それらもインストールするには `--include-lazy` を付けます。
+- `mise install --include-task-tools` は、現在のスコープのタスクが必要とするツールも、タスクを実行せずにインストールします。これは CI、コンテナー、オフラインのキャッシュを事前に温めるのに使えます。`--monorepo` を付けると、設定されたすべてのモノレポのルートが対象に含まれます。
+
+[`mise exec`（原文）](https://mise.jdx.dev/cli/exec.html) は同じ設定ファイルを読み込むため、有効化や shim を使わなくても、任意のコマンドの前に `mise exec --` を付けるだけで使えます。`alias mx='mise exec --'` のようなエイリアスを作ると入力の手間が省けます。[`mise run`](/tasks/) はタスクのために同じツールと環境を読み込みます。
+
+## mise がツールを選択する仕組み {#how-tools-are-selected}
+
+1. mise は、現在のディレクトリ、その親ディレクトリ、グローバル設定から `mise.toml` などの設定ファイルを読み込みます。現在のディレクトリに近いファイルが、より上位のファイルを上書きします。[設定ファイルの場所](/configuration.html#mise-toml)を参照してください。
+2. [レジストリ（原文）](https://mise.jdx.dev/registry.html)は、`node` のような短い名前を[バックエンド（原文）](https://mise.jdx.dev/dev-tools/backends/)に対応付けます。バックエンドはバージョンを一覧表示し、ツールをインストールします。
+3. バックエンドは、`24` や `latest` のような[バージョン指定（原文）](https://mise.jdx.dev/dev-tools/versions.html)を解決します。mise は新しいバージョンを探す前に、一致するインストール済みのバージョンを再利用します。また、[ロックファイル（原文）](https://mise.jdx.dev/dev-tools/mise-lock.html)で結果を固定できます。
+4. mise は選択したツールを、コマンド、タスク、またはシェルの `PATH` に追加します。`mise exec` と `mise run` は、不足しているツールを先にインストールします。
+
+mise は `.tool-versions` ファイルも読み込みます。`.nvmrc` や `.python-version` のような他のツールのバージョンファイルを使うには、[idiomatic バージョンファイル（idiomatic version file）（原文）](https://mise.jdx.dev/dev-tools/versions.html#idiomatic-version-files)を有効にする必要があります。asdf から移行する場合は、[asdf からの移行](/dev-tools/comparison-to-asdf.html)を参照してください。あるディレクトリでどの設定ファイルが適用されるかを確認するには、`mise config ls` を実行します。
+
+## シェル、エディター、スクリプト {#shells-editors-and-scripts}
+
+- インタラクティブシェルでは、[mise を有効化（原文）](https://mise.jdx.dev/shell-setup.html)すると、プロンプトのたびに `PATH` とプロジェクトの環境変数が更新されます。
+- エディターや IDE では、プログラムが固定の実行ファイルのパスを必要とする場合に、[shim](/dev-tools/shims.html) または[エディターとの統合](/ide-integration.html)を使います。
+- スクリプトや CI では、`mise exec -- <command>` または `mise run <task>` を実行します。[継続的インテグレーション](/continuous-integration.html)を参照してください。
+
+3つのアプローチの比較は [shim](/dev-tools/shims.html#overview) を参照してください。
+
+## ツールのアップグレード {#upgrade-tools}
+
+[`mise outdated`（原文）](https://mise.jdx.dev/cli/outdated.html) は、設定されたツールのうち、その指定に一致する新しいリリースがあるものを一覧表示します。`--bump` を付けると、全体で最新のリリースと比較します。
+
+[`mise upgrade`（原文）](https://mise.jdx.dev/cli/upgrade.html) は、各指定の範囲内で最新のリリースをインストールします。`mise.toml` に `node = "24"` がある場合、`mise upgrade node` は 24.x の最新をインストールし、`mise.toml` は変更しません。プロジェクトが[ロックファイル（原文）](https://mise.jdx.dev/dev-tools/mise-lock.html)を使っている場合、mise は `mise.lock` を新しいバージョンに更新します。
+
+`--bump` は最新のリリースにアップグレードし、同じ精度で指定を書き換えます。`node = "24"` は `node = "26"` になり、`node = "24.11.1"` は最新の正確なバージョンになります。`mise upgrade --bump node@latest` のように指定を明示すると、mise は代わりにその指定を書き込みます。
+
+```sh
+mise upgrade --dry-run      # show what would change
+mise upgrade --interactive  # pick tools from a list
+mise upgrade --bump --local # bump only tools in project config
+mise upgrade --global       # upgrade only tools in global config
+```
+
+`--global` は、プロジェクトが独自にあるツールのバージョンを設定している場合でも、グローバル設定の指定をアップグレードします。プロジェクトの設定やロックファイルは決して変更しません。`mise outdated --global` は、それによってインストールされるものを表示します。自身を更新するツールもこの2つのコマンドを使います。[自己更新するツール（原文）](https://mise.jdx.dev/dev-tools/self-updating-tools.html)を参照してください。
+
+アップグレード後、mise は置き換えた古いバージョンを、[`upgrade.prune_after`（原文）](https://mise.jdx.dev/configuration/settings.html#upgrade.prune_after) の期間が経過した時点で削除するようにスケジュールします。これにより、実行中のプログラムは引き続きそのバージョンを使えます。すぐに削除するには `--prune` を、残すには `--no-prune` を指定します。置き換えたバージョンをデフォルトで残すには、[`upgrade.auto_prune`（原文）](https://mise.jdx.dev/configuration/settings.html#upgrade.auto_prune) を `false` に設定します。
+
+## ツールの自動更新 {#automatic-tool-updates}
+
+グローバル設定（`~/.config/mise/config.toml`）にあるツールは、自身を最新の状態に保てます。そのエントリに `auto_update` を設定します。
+
+```toml [~/.config/mise/config.toml]
+[tools]
+claude = { version = "latest", auto_update = true }
+node = { version = "24", auto_update = "6h" }
+```
+
+shim または `mise exec` がツールを実行しようとしたとき、その間隔内に mise が更新を確認していなければ、mise は先にそのツールに対して `mise upgrade` を実行し、通常のインストールの進行状況を表示してから、新しいバージョンを実行します。更新は指定の範囲内に留まります。`node = "24"` は 24.x の最新になり、26 になることはありません。更新に失敗した場合やオフラインの場合、mise は警告を出し、手元にあるバージョンを実行します。
+
+[`mise activate`（原文）](https://mise.jdx.dev/shell-setup.html) を使ったシェルでは、ツールは `PATH` から直接実行されるため、コマンドとの間に何も挟まりません。代わりに、シェルのプロンプトが表示され、あるツールの確認時期が来ていれば、mise はバックグラウンドで更新を開始し、プロンプトは待たされません。更新が完了し、シェルが環境を再読み込みした後（これはプロンプトの表示時に行われます）、コマンドは新しいバージョンを使います。更新の出力は破棄されます。失敗した場合は `mise doctor` がエラーを表示します。
+
+`auto_update = true` は [`tool_update.check_duration`（原文）](https://mise.jdx.dev/configuration/settings.html#tool_update.check_duration) ごとに確認します。`"6h"` のような期間を指定すると、そのツール独自の間隔を設定します。1時間未満の間隔は1時間に引き上げられます。
+
+各ツールに個別に指定せずにグローバル設定のすべてのツールを更新するには、[`tool_update.global_auto`（原文）](https://mise.jdx.dev/configuration/settings.html#tool_update.global_auto) を `true` または間隔に設定します。ツール自身の `auto_update` が引き続き優先されるため、`auto_update = false` でそのツールを対象外にできます。
+
+```toml [~/.config/mise/config.toml]
+[settings]
+tool_update.global_auto = "12h"
+
+[tools]
+claude = "latest"
+node = { version = "24", auto_update = "6h" }
+python = { version = "3.13", auto_update = false }
+```
+
+::: tip 24h の待機は最大 48h になりうる
+更新は [`minimum_release_age`（原文）](https://mise.jdx.dev/security.html#minimum-release-age) に従います。これは[ほとんどのバックエンド（原文）](https://mise.jdx.dev/security.html#which-backends-have-a-default)でデフォルトが `24h` です。リリースは公開から24時間後に対象となり、mise はそれを次の確認時にようやく検知します。そのため、確認間隔ごとに少なくとも1回ツールを起動していれば、更新はリリースから24〜48時間後に適用されます。そうでなければ、さらに遅くなります。
 :::
 
-## 動作の仕組み {#how-it-works}
+さらに長く待つには、ツールに `minimum_release_age` を設定します。
 
-mise は、ツールのインストール、バージョン管理、環境設定を自動的に処理する、高度でありながら使いやすいシステムを通じて開発ツールを管理します。
-
-### ツール解決のフロー {#tool-resolution-flow}
-
-ディレクトリに入るか、コマンドを実行すると、mise は次のプロセスに従います。
-
-1. **設定の探索**: mise はディレクトリツリーをさかのぼって設定ファイル（`mise.toml`、`.tool-versions` など）を探し、それらを階層的にマージします
-2. **ツールの解決**: mise は、レジストリとバージョンリストを使って、バージョン指定（`node@latest` や `python@3` など）を具体的なバージョンに解決します
-3. **バックエンドの選択**: mise は各ツールを処理するための適切な[バックエンド（原文）](https://mise.jdx.dev/dev-tools/backend_architecture.html)を選択します（core、asdf、aqua など）
-4. **インストールの確認**: mise は必要なツールのバージョンがインストールされているかを確認し、不足しているものは自動的にインストールします
-5. **環境の設定**: mise は、解決されたツールのバージョンを使用するように `PATH` や環境変数を設定します
-
-### 環境の統合 {#environment-integration}
-
-mise は、開発環境と統合するためのいくつかの方法を提供します。
-
-**自動有効化**: `mise activate` を使うと、mise はシェルのプロンプトにフックし、ディレクトリを変更したときに環境を自動的に更新します。
-
-```bash
-eval "$(mise activate zsh)"  # In your ~/.zshrc
-cd my-project               # Automatically loads mise.toml tools
+```toml [~/.config/mise/config.toml]
+[tools]
+node = { version = "24", auto_update = "6h", minimum_release_age = "3d" }
 ```
 
-**オンデマンド実行**: 永続的な有効化なしに mise の環境でコマンドを実行するには `mise exec` を使います。
+- これを有効にできるのはグローバル設定だけです。プロジェクトの設定では有効にできません。また、プロジェクトがそのツールの独自のバージョンを設定している場合、そのプロジェクト内での実行ではツールは更新されません。
+- 起動時に確認されるのは、実行されるツールだけです。`mise exec -- npm test` は `claude` を更新しません。有効化したシェルでは、プロンプトの表示時に、間隔が経過したすべての対象ツールを確認します。タスクがツールを更新することはありません。
+- `node = "24.11.1"` のような正確なバージョンは決して更新されません。グローバルのロックファイル（`mise lock --global`）がツールを固定している場合、更新によってロックのエントリが新しいバージョンに移ります。プロジェクトの設定とロックファイルは決して変更されません。
+- 更新されるのはインストール済みのツールだけです。誰もまだ実行していない[遅延ツール（lazy tool）](/dev-tools/shims.html#lazy-tools)のように、インストール済みのバージョンがないツールは、何かがインストールするまでそのままです。
+- オフライン、CI、または `locked = true` の場合、更新は実行されません。
+- 以前のバージョンは、`mise upgrade` の後と同じスケジュールで削除されます。
+- ツールの最後の更新が失敗した場合、`mise doctor` がエラーを表示します。
 
-```bash
-mise exec -- node my-script.js  # Runs with tools from mise.toml
+起動時やプロンプトの表示時ではなくスケジュールに沿って確認し、シェルを使っていないときでもツールを最新に保つには、グローバル設定で `tool-update` サービスを宣言し、`mise bootstrap services apply` を実行します。
+
+```toml [~/.config/mise/config.toml]
+[bootstrap.services.mise-tool-update]
+builtin = "tool-update"
 ```
 
-**shim**: mise は、正しいツールのバージョンを自動的に使用する軽量なラッパースクリプトを作成できます。
+このサービスは1時間に1回確認し、間隔が来た各ツールを更新します。サービスの実行中は、起動時やプロンプトの表示時にツール自身が更新されることはありません。[ユーザーサービス（原文）](https://mise.jdx.dev/bootstrap/services.html#user-services)を参照してください。
 
-```bash
-mise activate --shims  # Creates shims instead of modifying PATH
-```
+## ツールの削除 {#remove-tools}
 
-### パスの管理 {#path-management}
+| コマンド                 | 設定の編集          | 削除されるインストール済みのバージョン                        |
+| ------------------------ | ------------------- | ------------------------------------------------------------- |
+| `mise unuse node`        | 指定を削除する      | 追跡中の設定ファイルやツールスタブがもう必要としないバージョン |
+| `mise uninstall node@22` | いいえ              | そのバージョン。`--all` でそのツールのすべてのバージョンを削除 |
+| `mise prune`             | いいえ              | 追跡中の設定ファイルやツールスタブがもう必要としないすべてのバージョン |
 
-mise は、正しいツールのバージョンを優先させるために `PATH` 環境変数を変更します。
+[`mise unuse`（原文）](https://mise.jdx.dev/cli/unuse.html) は、そのツールを宣言している最初に読み込まれた設定ファイル、または `--path`、`--global`、`--env` で選んだファイルを編集します。バージョンの引数は書かれたとおりの指定と照合されるため、`node = "24"` は解決後のバージョンではなく `mise unuse node@24` で削除します。インストールを残すには `--no-prune` を付けます。
 
-```bash
-# Before mise
-echo $PATH
-/usr/local/bin:/usr/bin:/bin
+[`mise uninstall`（原文）](https://mise.jdx.dev/cli/uninstall.html) はインストールを削除し、設定はそのままにします。そのため、まだ設定されているツールは次の `mise install` で再びインストールされます。
 
-# After mise activation in a project with node@20
-echo $PATH
-/home/user/.local/share/mise/installs/node/20.11.0/bin:/usr/local/bin:/usr/bin:/bin
-```
+[`mise prune`（原文）](https://mise.jdx.dev/cli/prune.html) は、mise が使ったことのあるどの設定ファイルも、実行されたことのあるどのツールスタブも、もう必要としないバージョンを削除します。mise はそれらのファイルを `~/.local/state/mise/tracked-configs` と `tracked-stubs` に記録しています。実行中のプロセスの起動元になったバージョンは残します。何が削除されるかを確認するには、`mise ls --prunable` または `mise prune --dry-run` を実行します。
 
-これにより、`node` を実行したときに、システム全体のインストールではなく、プロジェクトの設定で指定されたバージョンが使われることが保証されます。
+## 自動インストール {#auto-install-mechanisms}
 
-### 設定の階層 {#configuration-hierarchy}
+設定されたツールが見つからないとき、mise は失敗する代わりにそれをインストールできます。[`auto_install`（原文）](https://mise.jdx.dev/configuration/settings.html#auto_install) を `false` に設定すると、以下の最初の4つのケースが無効になります。また、[`auto_install_disable_tools`（原文）](https://mise.jdx.dev/configuration/settings.html#auto_install_disable_tools) には、それらがスキップするツールを列挙します。遅延ツールはそれでも初回使用時にインストールされます。
 
-mise は、広い範囲から特定の設定へと段階的に適用される、入れ子の設定をサポートしています。
+| 実行するもの                                                              | mise がインストールするもの                                    | 制御する設定                                                                                                      |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `mise exec`                                                               | 設定が選択する、不足しているツール                             | [`exec_auto_install`（原文）](https://mise.jdx.dev/configuration/settings.html#exec_auto_install)                 |
+| `mise run`                                                                | タスクが必要とする、不足しているツール                         | [`task.run_auto_install`（原文）](https://mise.jdx.dev/configuration/settings.html#task.run_auto_install)         |
+| 有効化したシェルでの不明なコマンド、または不足しているバージョンの shim   | そのコマンドを提供する、設定済みのツール                       | [`not_found_auto_install`（原文）](https://mise.jdx.dev/configuration/settings.html#not_found_auto_install)       |
+| どの設定にも記載されていない不明なコマンド                                | それを提供する唯一のレジストリのツール（グローバル設定に追加） | [`not_found_auto_install_registry`（原文）](https://mise.jdx.dev/configuration/settings.html#not_found_auto_install_registry)（デフォルトは無効） |
+| [遅延ツール](/dev-tools/shims.html#lazy-tools)のコマンド                  | そのツール（初回使用時）                                       | ツールの `lazy = true`                                                                                            |
 
-```bash
-~/.config/mise/config.toml      # Global defaults
-~/work/mise.toml                # Work-specific tools
-~/work/project/mise.toml        # Project-specific overrides
-~/work/project/.tool-versions   # Legacy asdf compatibility
-```
-
-各レベルは前のレベルを上書きまたは拡張でき、さまざまなコンテキストにわたってツールのバージョンを細かく制御できます。
+自動インストールが無効の場合、`mise exec` はツールが不足していると警告し、`PATH` 上にあるそのコマンドを実行します。コマンドが見つからない場合のハンドラーはレジストリのコマンド名からツールを探すため、`cargo:some-crate` のような生のバックエンド指定で宣言されたツールは、そのいずれかのバージョンがインストールされるまでインストールできません。[トラブルシューティング](/troubleshooting.html#auto-install-on-command-not-found-does-not-trigger)を参照してください。
 
 ## ツールオプション {#tool-options}
 
-ツールオプションを使うと、ツールのインストールと設定の方法をカスタマイズできます。整理しやすくするために入れ子の設定に対応しており、プラットフォーム固有の設定に特に便利です。
+オプションを設定するには、ツールをバージョン文字列ではなくテーブルとして記述します。以下のオプションは、対応するバックエンドが行に明記されている場合を除き、どのツールのエントリでも使えます。GitHub の `matching` のようなバックエンド固有のオプションは、各[バックエンドのページ（原文）](https://mise.jdx.dev/dev-tools/backends/)に記載されています。
 
-### テーブル形式（推奨） {#table-format-recommended}
+| オプション            | 機能                                                                                                                                                                                                                                                                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`             | [バージョン指定（原文）](https://mise.jdx.dev/dev-tools/versions.html)。[それらの種類の指定（原文）](https://mise.jdx.dev/dev-tools/versions.html#scopes)には、代わりに `prefix`、`ref`、`path` を使います。 |
+| `os`                  | これらのプラットフォームでのみツールをインストール・使用します。[OS 固有のツール](#os-specific-tools)を参照してください。 |
+| `depends`             | これらのツールを先にインストールします。[ツールの依存関係](#tool-dependencies)を参照してください。 |
+| `install_env`         | ツールをインストールするコマンド（ビルドスクリプト、パッケージマネージャー、プラグインのフック）とその `postinstall` のための環境変数。mise はツールの解決とダウンロードの際に、ここから GitHub、GitLab、Forgejo のトークンの変数も読み込みます。[トークン（原文）](https://mise.jdx.dev/dev-tools/github-tokens.html)を参照してください。 |
+| `postinstall`         | ツールのインストール後に実行するコマンド。[ツールの postinstall コマンド](#tool-postinstall-commands)を参照してください。 |
+| `lazy`, `lazy_bins`   | ツールのコマンドのいずれかが初めて実行されたときにツールをインストールします。[遅延ツール](/dev-tools/shims.html#lazy-tools)を参照してください。 |
+| `auto_update`         | グローバル設定でのみ、ツールの実行前にツールを更新します。[ツールの自動更新](#automatic-tool-updates)を参照してください。 |
+| `minimum_release_age` | バックエンドがリリース日を報告する場合に、リリースから少なくともこの期間が経過したバージョンのみを選択します。[最小リリース経過期間（原文）](https://mise.jdx.dev/security.html#minimum-release-age)を参照してください。 |
+| `prerelease`          | `mise ls-remote` と、`latest` やプレフィックスの解決にプレリリースを含めます。core の `java` プラグインを除くすべてのバックエンドがこれに従います。[`prereleases`（原文）](https://mise.jdx.dev/configuration/settings.html#prereleases)を参照してください。 |
+| `version_order`       | aqua、github、gitlab、forgejo、http のツールで、バージョンを `semver` または `source` の順に並べます。[バージョンの順序（原文）](https://mise.jdx.dev/dev-tools/versions.html#version-ordering)を参照してください。 |
 
-入れ子のオプションを指定する最もクリーンな方法は、TOML のテーブルを使うことです。
+mise の HTTP クライアントは `install_env` からプロキシの変数を読み込まないため、`HTTPS_PROXY` などの変数は mise を起動する環境で設定してください。
 
-```toml
-[tools."http:my-tool"]
-version = "1.0.0"
+### インライン記法とテーブル記法 {#table-format}
 
-[tools."http:my-tool".platforms]
-macos-x64 = {
-  url = "https://example.com/my-tool-macos-x64.tar.gz",
-  checksum = "sha256:abc123",
-}
-linux-x64 = {
-  url = "https://example.com/my-tool-linux-x64.tar.gz",
-  checksum = "sha256:def456",
-}
-```
+短いオプションは1行に収まります。ツールに複数のオプションがある場合はテーブルを使います。次の2つは同等です。
 
-### ドット記法 {#dotted-notation}
+::: code-group
 
-よりシンプルな入れ子の設定には、ドット記法も使えます。
-
-```toml
-[tools."http:my-tool"]
-version = "1.0.0"
-platforms.macos-x64.url = "https://example.com/my-tool-macos-x64.tar.gz"
-platforms.linux-x64.url = "https://example.com/my-tool-linux-x64.tar.gz"
-simple_option = "value"
-```
-
-### 汎用的な入れ子サポート {#generic-nested-support}
-
-どのバックエンドでも、複雑な設定を整理するために入れ子のオプションを使えます。
-
-```toml
-[tools."custom:my-backend"]
-version = "1.0.0"
-
-[tools."custom:my-backend".database]
-host = "localhost"
-port = 5432
-
-[tools."custom:my-backend".cache.redis]
-host = "redis.example.com"
-port = 6379
-```
-
-内部的には、バックエンドがアクセスできるように、入れ子のオプションはドット記法（例: `platforms.macos-x64.url`、`database.host`、`cache.redis.port`）にフラット化されます。
-
-### バージョンの順序 {#version-ordering}
-
-バックエンドは通常、バージョンソースから返される順序を保持します。Aqua、
-GitHub、GitLab、Forgejo、HTTP の各ツールは、アップストリームが新しいリリースラインの後にバックポートを公開する場合に、
-セマンティックバージョンの優先順位を選択できます。
-
-```toml
+```toml [Inline]
 [tools]
-"github:owner/tool" = { version = "latest", version_order = "semver" }
+ripgrep = { version = "15", os = ["linux", "macos"] }
 ```
 
-`latest` の場合、バックエンドからの信頼できる（authoritative）結果が依然として優先されます。例えば、
-GitHub や Forgejo で **Latest** と印付けられたリリースです。そのリリースが要求されたパッケージと一致しない場合、
-またはバックエンドに信頼できる latest の結果がない場合、mise はバージョンリストにフォールバックし、そこで `version_order` を適用します。これは
-複数のプロダクトを含むリポジトリで重要です。リポジトリ全体の Latest リリースには、すべてのパッケージのアセットが含まれているとは限らないためです。
-
-`version_order = "semver"` を指定すると、mise はそのフォールバックリストやバージョンのプレフィックスを解決する際に、有効な
-セマンティックバージョンを優先順位で並べます。不透明な（opaque）バージョンはセマンティックバージョンより前のソース順を保持するため、正確なリクエストである
-`nightly` は引き続き動作します。ビルドメタデータは優先順位に影響しません。レジストリの
-エントリでは、セマンティックバージョニングに従うことが分かっているツールに対してこのオプションを設定することがあります。
-ユーザーは `version_order = "source"` を設定することで、バックエンドのデフォルトの順序に戻せます。
-
-このオプションはバージョンの解決にのみ影響します。`mise ls-remote` は、
-バックエンドから返される正規の順序を引き続き表示します。
-
-### ツールの postinstall コマンド {#tool-postinstall-commands}
-
-ツールの設定に `postinstall` フィールドを追加すると、そのツールのインストールが完了した直後にコマンドを実行できます。これは `[hooks].postinstall` とは別物で、特定のツールがインストールされたときにのみ適用されます。
-
-```toml
-[tools]
-node = { version = "22", postinstall = "corepack enable" }
+```toml [Table]
+[tools.ripgrep]
+version = "15"
+os = ["linux", "macos"]
 ```
 
-動作:
-
-- そのツール / バージョンのインストールが正常に完了すると、コマンドが1回実行されます。
-- コマンドの実行中は、そのツールの bin パスが PATH 上にあるため、インストールされたツールを直接呼び出せます。
-- 環境変数には、そのツールのインストールディレクトリを指す `MISE_TOOL_INSTALL_PATH` と、そのツールの `install_env` オプションで指定された変数が含まれます。
-- インストールが失敗した場合、`postinstall` コマンドは実行されません。
-
-## OS 固有のツール {#os-specific-tools}
-
-`os` フィールドを使うと、ツールを特定のオペレーティングシステムに制限できます。
-
-```toml
-[tools]
-# Only install on Linux and macOS
-ripgrep = { version = "latest", os = ["linux", "macos"] }
-
-# Only install on Windows
-"npm:windows-terminal" = { version = "latest", os = ["windows"] }
-
-# Works with other options
-"cargo:usage-cli" = {
-    version = "latest",
-    os = ["linux", "macos"],
-    locked = false
-}
-```
-
-`os` フィールドには、オペレーティングシステムの識別子の配列を指定できます。
-
-- `"linux"` - すべての Linux ディストリビューション
-- `"macos"` - macOS（Darwin）。エイリアスとして `"darwin"` も使えます
-- `"windows"` - Windows。エイリアスとして `"win"` も使えます
-
-### OS / アーキテクチャの組み合わせ {#os-architecture-combinations}
-
-`os/arch` という構文を使うと、特定の OS とアーキテクチャの組み合わせにツールを制限することもできます。
-
-```toml
-[tools]
-# Only install on macOS ARM64 and all Linux (skips macOS x86_64)
-hk = { version = "latest", os = ["linux", "macos/arm64"] }
-
-# Only install on Linux x86_64
-mytool = { version = "latest", os = ["linux/x64"] }
-```
-
-サポートされているアーキテクチャの識別子:
-
-- `"arm64"`（または `"aarch64"`）
-- `"x64"`（または `"x86_64"` または `"amd64"`）
-
-エントリに `/` が含まれる場合、OS とアーキテクチャの両方が一致する必要があります。エントリが OS 名だけの場合、その OS 上のどのアーキテクチャにもマッチします。
-
-ツールが `os` の制限を指定していて、現在のオペレーティングシステムがそのリストに含まれない場合、mise はそのツールのインストールと使用をスキップします。
-
-## ツールの依存関係 {#tool-dependencies}
-
-`depends` フィールドを使うと、ツール間の明示的なインストール依存関係を宣言できます。これにより、あるツールが完全にインストールされてから別のツールのインストールが始まることが保証されます。
-
-```toml
-[tools]
-python = "3.12.11"
-"pipx:ruff" = { version = "latest", depends = ["python"] }
-```
-
-この例では、`pipx:ruff` は `python` のインストールが完了するのを待ってから開始します。
-
-`depends` フィールドには、単一の文字列または文字列の配列を指定できます。
-
-```toml
-[tools]
-# Single dependency
-"pipx:ruff" = { version = "latest", depends = "python" }
-
-# Multiple dependencies
-"pipx:ruff" = { version = "latest", depends = ["python", "pipx"] }
-```
-
-ユーザーが指定した `depends` は、現在のインストール対象に含まれるツールに順序の制約を追加します。設定されたあるツールのインストールが、別の設定済みツールのインストールが始まる前に完了しなければならない場合、特にそれらが本来は並列に実行されるようなときに使います。
-
-### vfox プラグインのフック依存関係 {#vfox-plugin-hook-dependencies}
-
-`[tools]` 内の `depends` は、インストールグラフの順序を追加するだけです。それ自体では、フック実行時の依存関係を宣言したり、vfox のインストールフックの実行中に使われる `PATH` にそれらのツールを追加したりはしません。
-
-vfox プラグインの場合、インストールフックが必要とするツールは `metadata.lua` の `PLUGIN` テーブルで宣言します。
-
-```lua
-PLUGIN = {
-    name = "example",
-    version = "1.0.0",
-    depends = { "go" },
-}
-```
-
-ツール名は `mise.toml` に記述する形式と同じものを使います。一致するツールが設定されている場合、mise はそれらのメタデータのエントリを使って、現在のインストールジョブの順序を決め、フックの実行環境を構築します。詳細は[ツールプラグイン開発（原文）](https://mise.jdx.dev/tool-plugin-development.html#_2-metadata-lua)を参照してください。
-
-## キャッシュとパフォーマンス {#caching-and-performance}
-
-mise はオーバーヘッドを最小化するために、インテリジェントなキャッシュを使用します。
-
-- **バージョンリスト**: API 呼び出しの繰り返しを避けるため、毎日キャッシュされます
-- **インストールアーティファクト**: 再インストールを高速化するため、ダウンロードがキャッシュされます
-- **環境の解決**: シェルのプロンプトを高速化するため、環境のセットアップがキャッシュされます
-- **プラグインのメタデータ**: 操作を高速化するため、プラグイン情報がキャッシュされます
-
-これにより、mise が日々の開発ワークフローに与えるレイテンシは最小限に抑えられます。
-
-::: info
-有効化した後、mise はディレクトリが変更されたとき、またはプロンプトが_表示された_ときに、PATH のような環境変数を更新します。
-[よくある質問](/faq#what-does-mise-activate-do)を参照してください。
 :::
 
-有効化した後は、プロンプトが表示されるたびに `mise hook-env` を呼び出して新しい
-環境変数を取得します。
-これは非常に高速です。ディレクトリが変更されていない場合や
-`mise.toml`/`.tool-versions` ファイルが変更されていない場合は、早期に終了します。
+mise は TOML 1.1 を読み込むため、インラインテーブルは複数行にまたがり、末尾にカンマを付けられます。HTTP バックエンドのプラットフォームごとの `platforms` のような入れ子のオプションには、ドット区切りのキーを使うか、プラットフォームごとに1行ずつ書けます。
 
-`mise` はランタイムが直接呼び出されるように、事前に `PATH` を変更します。これにより、ツールの呼び出しにオーバーヘッドはゼロになり、`which node` のようなコマンドはバイナリの実際のパスを返します。
-asdf のような他のツールは、呼び出されたときにランタイムを動的に特定するための shim ファイルのみをサポートしており、これはわずかな遅延を追加し、一部のコマンドで問題を引き起こすことがあります。詳細は[shim](/dev-tools/shims)を参照してください。
-
-## よく使うコマンド {#common-commands}
-
-開発ツールを扱う上で特に重要なコマンドを紹介します。各コマンドの見出しを
-クリックすると
-そのリファレンスドキュメントページに移動し、利用可能なすべてのオプションや、さらに多く
-の
-例を確認できます。
-
-### [`mise use`（原文）](https://mise.jdx.dev/cli/use.html) {#mise-use}
-
-一部のユーザーにとっては、`mise use` だけ覚えれば十分なコマンドかもしれません。これは次のことを行います。
-
-- 必要であれば、そのツールのプラグインをインストールします
-- 指定されたバージョンをインストールします
-- そのバージョンをアクティブに設定します（つまり `PATH` を更新します）
-- 現在の設定ファイル（`mise.toml` または `.tool-versions`）を更新します
-
-```shell
-> cd my-project
-> mise use node@26
-# download node, verify signature...
-mise node@26.x.x ✓ installed
-mise ~/my-project/mise.toml tools: node@26.x.x # mise.toml created/updated
-
-> which node
-~/.local/share/mise/installs/node/26/bin/node
+```toml [mise.toml]
+[tools."http:my-tool"]
+version = "1.0.0"
+platforms.macos-arm64.url = "https://example.com/my-tool-macos-arm64.tar.gz"
+platforms.linux-x64.url = "https://example.com/my-tool-linux-x64.tar.gz"
 ```
 
-`mise use node@26` は node-26 の最新バージョンをインストールし、ローカルディレクトリの
-`mise.toml`
-設定ファイルを作成または更新します。結果として得られるファイルは次のようになります。
+チェックサムと実行ファイルの選択については、[HTTP バックエンド（原文）](https://mise.jdx.dev/dev-tools/backends/http.html)を参照してください。
+
+### コマンドラインでのオプション指定 {#on-the-command-line}
+
+ツール名の後、バージョンの前に、角括弧で囲んだオプションをカンマ区切りで付け加えます。シェルが角括弧を展開しないように、引数をクォートしてください。
+
+```sh
+mise use 'github:jqlang/jq[version_prefix=jq-,rename_exe=jq]@1.8.2'
+```
+
+同じ形式は `mise install` と `mise exec` でも使えます。`mise use` はオプションを `mise.toml` に書き込みます。
 
 ```toml [mise.toml]
 [tools]
-node = "26"
+"github:jqlang/jq" = { version = "1.8.2", version_prefix = "jq-", rename_exe = "jq" }
 ```
 
-そのディレクトリにいる間は、常にその `node` のバージョンが使用されます。
+`mise use --tool-option KEY=VALUE` は、その後に続くツールにオプションを設定します。`mise use --tool-option mr_boxington=true rust mr-boxington` は `rust` にオプションを設定し、そのオプションが必要とする `mr-boxington` ツールを追加します。[Mr Boxington で Cargo のビルドをキャッシュする（原文）](https://mise.jdx.dev/lang/rust.html#share-cargo-builds-with-mr-boxington)を参照してください。
 
-`mise use -g node@26` も同様の処理を行いますが、[グローバル設定](/configuration.html#global-config-config-mise-config-toml)（`~/.config/mise/config.toml`）を更新するため、ローカルディレクトリの階層に設定ファイルが無い限り、node-26 がそのユーザーの
-デフォルトバージョンになります。
+### ツールオプションでの変数 {#templates-in-tool-configuration}
 
-`mise use` を使う代わりに `mise.toml` を直接編集することもできます — 効果は同じです。編集後に新しいツールをインストールするには `mise install` を実行してください。
+バージョンとオプションの値には、環境変数や [`vars`（原文）](https://mise.jdx.dev/configuration/vars.html) を使った[テンプレート（原文）](https://mise.jdx.dev/templates.html)を使えます。これには、`[env]` が `_.source`、`_.file`、env モジュールで読み込む値も含まれます。例えば、Go のインストールで社内のモジュールプロキシを使うには次のようにします。
 
-### [`mise install`（原文）](https://mise.jdx.dev/cli/install.html) {#mise-install}
+```toml [mise.toml]
+[vars]
+goproxy = "https://goproxy.example.com"
 
-`mise install` はツールをインストールしますが有効化はしません。つまり、ツールをダウンロード / ビルド / コンパイル
-して `~/.local/share/mise/installs` に配置しますが、`.mise-toml` や `.tool-versions` ファイルでバージョンを
-「設定」しない限り使用できません。
-
-::: tip
-`asdf` から移行してきた場合、プラグインを先にインストールするために `mise plugin add` を実行する必要はありません。
-必要であれば自動的に行われます。もちろん、そうしたい場合や、デフォルトのレジストリに無いプラグインを使いたい場合は、手動で
-インストールすることもできます。
-:::
-
-使い方には多くのパターンがあります。
-
-- `mise install node@20.0.0` - 特定のバージョンをインストールします
-- `mise install node@20` - このプレフィックスに一致する最新のバージョンをインストールします
-- `mise install node` - `mise.toml`（または他の
-  設定ファイル）で現在指定されている node のバージョンをインストールします
-- `mise install` - 設定ファイルで指定されたすべてのプラグインとツールをインストールします
-
-### [`mise exec`|`mise x`（原文）](https://mise.jdx.dev/cli/exec.html) {#mise-exec-mise-x}
-
-`mise x` は、特定のツールを使った単発のコマンドに使えます。例えば、python3.12 でスクリプトを実行したい
-場合:
-
-```sh
-mise x python@3.12 -- ./myscript.py
+[tools]
+go = "1.27"
+"go:github.com/mikefarah/yq/v4" = { version = "latest", install_env = { GOPROXY = "{{ vars.goproxy }}" } }
 ```
 
-Python がまだインストールされていなければインストールされます。`mise x` はローカル / グローバルの
-`.mise-toml`/`.tool-versions` ファイルも読み込むため、`mise activate` や shim を使いたくない場合は、コマンドの前に
-`mise x --` を付けるだけで mise を使えます。
+### OS 固有のツール {#os-specific-tools}
 
-```sh
-$ mise use node@20
-$ mise x -- node -v
-20.x.x
+`os` を設定すると、一部のプラットフォームでのみツールをインストール・使用します。それ以外のプラットフォームでは、mise はそのツールをスキップします。
+
+```toml [mise.toml]
+[tools]
+# Linux and macOS only
+ripgrep = { version = "latest", os = ["linux", "macos"] }
+
+# Windows only
+"github:PowerShell/PowerShell" = { version = "latest", os = ["windows"] }
+
+# Linux, and macOS on Apple silicon
+hk = { version = "latest", os = ["linux", "macos/arm64"] }
 ```
 
-::: tip
-これを頻繁に使うなら、エイリアスが便利です。
+値は `linux`、`macos`（または `darwin`）、`windows`（または `win`）、`unix`（Windows 以外のすべてのプラットフォーム）です。`macos/arm64` や `linux/x64` のようにアーキテクチャを付けると、値を絞り込めます。アーキテクチャは `arm64`（または `aarch64`）と `x64`（または `x86_64`、`amd64`）です。アーキテクチャを付けない値は、そのプラットフォーム上のすべてのアーキテクチャにマッチします。
 
-```sh
-alias mx="mise x --"
+### ツールの依存関係 {#tool-dependencies}
+
+`depends` は、あるツールが他のツールのインストール完了を待つようにします。ツールのインストールや `postinstall` が、そのバックエンドがもともと必要としない別のツールを実行する場合に使います。
+
+```toml [mise.toml]
+[tools]
+node = "24"
+# postinstall runs npm, so node must finish installing first
+# (github:example/acme is a placeholder)
+"github:example/acme" = { version = "1.2.3", depends = ["node"], postinstall = "npm install --prefix ~/.acme acme-plugins" }
 ```
 
-:::
+`depends` には1つのツール名またはリストを指定します。これはインストールの順序を決めるだけで、列挙されたツールを追加したりインストールしたりはしません。それぞれのツールは `[tools]` にあって先にインストールされるか、すでに `PATH` 上にある必要があります。依存する側のツールがインストールされ、その `postinstall` を実行している間、列挙されたツールは `PATH` 上にあります。プラグインの作者は、プラグイン自身の要件を `PLUGIN.depends` で宣言します。[ツールプラグイン開発（原文）](https://mise.jdx.dev/tool-plugin-development.html#depends)を参照してください。
 
-同様に、`mise run` を使うと[タスクを実行](/tasks/)でき、その際にすべてのツールを含む mise の
-環境も有効化されます。
+### ツールの postinstall コマンド {#tool-postinstall-commands}
 
-## 自動インストールの仕組み {#auto-install-mechanisms}
+`postinstall` は、このツールのインストール後にコマンドを実行します。これは、`mise install` 全体の後に1回実行される [`[hooks].postinstall`（原文）](https://mise.jdx.dev/hooks.html) フックとは別物です。
 
-mise には、不足しているツールやバージョンを必要に応じて自動的にインストールする複数の仕組みがあります。以下では、これらをトリガーされる方法とタイミングごとにグループ化し、それぞれの関連する設定項目を示します。すべての仕組みは、グローバルな[`auto_install`（原文）](https://mise.jdx.dev/configuration/settings.html#auto_install)設定を有効にする必要があります（**すべての `auto_install` 系の設定はデフォルトで有効です**）。
+```toml [mise.toml]
+[tools]
+node = { version = "24", postinstall = "corepack enable" }
+```
 
-### オンデマンド実行（[`mise x`（原文）](https://mise.jdx.dev/cli/exec.html)、[`mise r`（原文）](https://mise.jdx.dev/cli/run.html)） {#on-demand-execution-mise-x-mise-r}
+デフォルトでは、コマンドは mise がツールをインストールまたは修復したときにのみ実行され、インストールが失敗した後や `--dry-run` のときには決して実行されません。バージョンがすでにインストールされていても、`mise install` と `mise use` のたびに実行するには、`when = "always"` を設定します。
 
-[`mise x`（原文）](https://mise.jdx.dev/cli/exec.html) や [`mise r`（原文）](https://mise.jdx.dev/cli/run.html) のようなコマンドを実行すると、mise はそのコマンドの実行に必要な、不足しているツールのバージョンを自動的にインストールします。
+```toml [mise.toml]
+[tools]
+node = { version = "24", postinstall = { run = "corepack enable", when = "always" } }
+```
 
-- **トリガーのタイミング:** まだインストールされていないツール / バージョンで [`mise x`（原文）](https://mise.jdx.dev/cli/exec.html) や [`mise r`（原文）](https://mise.jdx.dev/cli/run.html) を使ったとき
-- **制御方法:**
-  - 設定項目: [`exec_auto_install`（原文）](https://mise.jdx.dev/configuration/settings.html#exec_auto_install)（デフォルト: true）
-  - 設定項目: [`task_auto_install`（原文）](https://mise.jdx.dev/configuration/settings.html#task_auto_install)（デフォルト: true）
+コマンドは、ツールの `bin` ディレクトリと[依存関係](#tool-dependencies)が `PATH` 上にあり、ツールの `install_env` とプロジェクトの `[env]` の値が設定された状態で実行されます。<code v-pre>{{ tools.ripgrep.path }}</code> のようなテンプレートは先にレンダリングされます。また、次の環境変数も受け取ります。
 
-### コマンドが見つからない場合のハンドラー（シェル統合） {#command-not-found-handler-shell-integration}
+- `MISE_TOOL_NAME`: ツールの短い名前（`node` など）。
+- `MISE_TOOL_VERSION`: インストールされたバージョン（`24.11.1` など）。
+- `MISE_TOOL_INSTALL_PATH`: ツールがインストールされたディレクトリ。
+- `MISE_CONFIG_FILE`: ツールを宣言した設定ファイル。
+- `MISE_CONFIG_ROOT`: そのファイルの[設定ルート](/configuration.html#config-root)。
+- `MISE_PROJECT_ROOT`: アクティブなプロジェクトのルート。アクティブなプロジェクトがない場合は設定ルート。
 
-シェルでコマンド（例: `node`）を入力してそれが見つからない場合、そのバイナリを提供するツールが分かれば、mise は不足しているツールのバージョンを自動的にインストールしようとします。
+`postinstall` が失敗すると、インストールも失敗します。
 
-- **トリガーのタイミング:** シェルでコマンドが見つからず、ハンドラーが有効になっているとき
-- **制御方法:**
-  - 設定項目: [`not_found_auto_install`（原文）](https://mise.jdx.dev/configuration/settings.html#not_found_auto_install)（デフォルト: true）
-- **制限事項:** mise はレジストリの bin メタデータからプロバイダーを特定するため、これは一度もインストールされたことがないツールでも、設定済みであれば対象になります — ただし、そのようなメタデータを持たない生のバックエンド指定（例: `cargo:some-crate`）で設定されたツールは対象外です。それらは `mise install` で明示的にインストールするか、`mise x` でインストールと実行を一度に行ってください。詳細は[トラブルシューティング](/troubleshooting.html#auto-install-on-command-not-found-does-not-trigger)を参照してください。
+## システムへのインストール {#system-installations}
 
-::: tip
-[`auto_install_disable_tools`（原文）](https://mise.jdx.dev/configuration/settings.html#auto_install_disable_tools) にツール名のリストを設定することで、特定のツールの auto_install を無効化できます。
-:::
+`mise install --system` は、ツールを共有ディレクトリ（デフォルトでは `/usr/local/share/mise/installs`）にインストールするため、マシン上のすべてのユーザーアカウントが1つのコピーを使えます。通常のユーザーとして実行してください。Unix では、mise は保護されたディレクトリに書き込むときにのみ `sudo` を呼び出します。対応するバックエンド、ディレクトリ、sudo の設定については、[システムインストール（原文）](https://mise.jdx.dev/dev-tools/system-installs.html)を参照してください。
+
+## キャッシュ {#caching-and-performance}
+
+mise は、ツールのリモートバージョンの一覧を [`fetch_remote_versions_cache`（原文）](https://mise.jdx.dev/configuration/settings.html#fetch_remote_versions_cache) で設定された期間だけ再利用します。一覧を更新するには `mise cache clear <tool>` を実行します。[キャッシュ（原文）](https://mise.jdx.dev/cache-behavior.html)を参照してください。また、有効化後の動作が遅いと感じる場合は[シェルプロンプトが遅い](/troubleshooting.html#slow-shell-prompts)を参照してください。

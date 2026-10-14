@@ -33,9 +33,9 @@ export type ScopeEntry = {
 export const TRANSLATED: readonly ScopeEntry[] = [
   // 導線
   { path: "getting-started.md", title: "はじめに" },
-  { path: "walkthrough.md", title: "ウォークスルー" },
+  { path: "walkthrough.md", title: "既存のプロジェクトで mise を使う" },
   { path: "installing-mise.md", title: "mise のインストール" },
-  { path: "ide-integration.md", title: "IDE との連携" },
+  { path: "ide-integration.md", title: "エディターと IDE" },
   { path: "continuous-integration.md", title: "継続的インテグレーション" },
   // 設定
   { path: "configuration.md", title: "mise.toml" },
@@ -44,7 +44,7 @@ export const TRANSLATED: readonly ScopeEntry[] = [
   { path: "dev-tools/index.md", title: "開発ツールの概要" },
   { path: "dev-tools/shims.md", title: "shim" },
   { path: "dev-tools/aliases.md", title: "ツールのエイリアス" },
-  { path: "dev-tools/comparison-to-asdf.md", title: "asdf との比較" },
+  { path: "dev-tools/comparison-to-asdf.md", title: "asdf からの移行" },
   { path: "environments/index.md", title: "環境変数" },
   { path: "tasks/index.md", title: "タスクの概要" },
   { path: "tasks/running-tasks.md", title: "タスクの実行" },

@@ -1,372 +1,299 @@
 ---
 title: よくある質問
+description: "Get short answers about mise commands, version requests, shell activation, config trust, and related tools."
+socialDescription: "Short answers about mise commands, version requests, activation, and config trust."
+outline: [2, 3]
 upstreamPath: docs/faq.md
 upstreamUrl: https://mise.jdx.dev/faq.html
-upstreamRef: 1c7db9f9
-upstreamDate: "2026-08-12"
+upstreamRef: 5749c813
+upstreamDate: "2026-10-13"
 ---
 
-# よくある質問 {#faqs}
+# よくある質問 {#faq}
 
-## git が未追跡ファイルとして表示するので、`mise.toml`/`.tool-versions` ファイルをプロジェクトに置きたくない {#i-don-t-want-to-put-a-mise-toml-tool-versions-file-into-my-project-since-git-shows-it-as-an-untracked-file}
+コマンドが失敗した場合は [トラブルシューティング](/troubleshooting.html) を参照するか、
+[エラーメッセージ（原文）](https://mise.jdx.dev/errors.html) でメッセージを調べてください。
 
-[`mise.local.toml`](/configuration.html#mise-toml) を使い、それをグローバルな gitignore ファイルに入れてください。このファイルは絶対にコミットしないでください。
+## 日常的なコマンド {#daily-commands}
 
-どうしても `mise.toml` や `.tool-versions` を使いたい場合、git にこれらのファイルを無視させる方法が3つあります。
+### `mise install` と `mise use` の違いは？ {#what-is-the-difference-between-mise-install-and-mise-use}
 
-- `mise.toml` をプロジェクトの `.git/info/exclude` に追加する。このファイルはプロジェクトにローカルなので、
-  コミットする必要はありません。
-- `mise.toml` をプロジェクトの `.gitignore` ファイルに追加する。この方法には、ignore ファイルへの変更を
-  コミットする必要があるという欠点があります。
-- `mise.toml` をグローバル gitignore（`core.excludesFile`）に追加する。これにより git はすべてのプロジェクトで
-  `mise.toml` ファイルを無視するようになります。必要であれば `git add --force mise.toml` で明示的にプロジェクトに
-  追加できます。
-
-## 「nodejs」と「node」（または「golang」と「go」）の違いは？ {#what-is-the-difference-between-nodejs-and-node-or-golang-and-go}
-
-これらはエイリアスになっています。例えば `mise use nodejs@14.0` は `mise install node@14.0` と同じです。つまり、
-これらを別々のプラグインにすることはできません。
-
-これはどちらが「正式な」名前か覚えなくていいようにするための便宜です。ただし、このエイリアスの動作がおかしいと感じたら、
-チケットを投稿するか、単に「node」と「go」を使い続けてください。内部的には、mise が設定ファイルを読んだり CLI 入力を
-受け取ったりする際に「nodejs」と「golang」を置き換えます。
-
-mise が `mise.toml` に _書き込む_ とき（`mise use`, `mise unuse`）は、正規の名前を書き込みます — `nodejs` という
-エントリはコメントを保ったまま `node` になります。`.tool-versions` ファイルは影響を受けず、依然として asdf の表記を
-使います。
-
-## `mise activate` は何をするのか？ {#what-does-mise-activate-do}
-
-シェルプロンプトが表示されるたびに `mise hook-env` を実行するシェルフックを登録します。`mise hook-env` は現在の
-環境変数（最も重要なのは `PATH` ですが、ツールによっては `GOROOT` や `JAVA_HOME` など他の変数もあります）を確認し、
-変更があったものを追加・削除・更新します。
-
-例えば、`java 17` の代わりに `java 18` が指定された別のディレクトリに `cd` した場合、次のプロンプトが表示される
-直前に、シェルは `eval "$(mise hook-env)"` を実行します。これは現在のシェルセッションで次のような内容を実行する
-ことになります。
+`mise install` はツールをインストールします。`mise use` はツールをインストールし、さらにそのバージョン指定を
+設定ファイルに書き込みます。
 
 ```sh
-export JAVA_HOME=$HOME/.local/share/installs/java/18
-export PATH=$HOME/.local/share/installs/java/18/bin:$PATH
+mise use node@24      # add Node 24 to mise.toml and install it
+mise install          # install every tool the project declares
+mise install node@24  # install Node 24 without changing config
 ```
 
-実際には `PATH` の更新はもう少し複雑です。java-17 を削除する処理も必要になるからですが、大体のイメージは伝わるかと
-思います。
+どちらのコマンドも、実行したシェルの環境は変更しません。シェルの有効化を設定している場合は次のプロンプトで
+変更が反映されます。そうでない場合は、`mise exec` や `mise run` でツールを実行してください。バージョンを
+指定しない `mise install node` は、プロジェクトが指定しているバージョンを、何も指定していなければ `latest` を
+インストールします。引数なしの `mise install` は `lazy = true` が付いたツールをスキップします。それらも
+インストールするには `--include-lazy` を付けてください。
 
-プロンプトが表示されるたびに `mise hook-env` を実行するのは過剰で、`cd` したときだけ実行すればいいと思うかもしれ
-ませんが、ディレクトリが変わらなくても実行が必要な状況は多くあります。例えば、現在のシェルで `.tool-versions` や
-`mise.toml` を編集した直後などです。
+### `mise use` はどこに書き込むのか？ {#where-does-mise-use-write-to}
 
-プロンプト表示時に実行される仕組みなので、非インタラクティブなセッション（bash スクリプトなど）で
-`mise activate` を使おうとすると、プロンプトが一度も表示されないため `mise hook-env` は呼ばれず、結果として
-`PATH` は一切変更されません。このような用途では、`PATH` を更新したいたびに手動で `mise hook-env` を呼ぶか、
-代わりに [shim](/dev-tools/shims.md) を使う方法があります（こちらが推奨です）。あるいは、特定のコマンドだけで
-mise を使いたい場合は、コマンドの前に [`mise x --`（原文）](https://mise.jdx.dev/cli/exec.html) を付けるだけで
-済みます。例えば `mise x -- npm test` や `mise x -- ./my_script.sh` のようにします。
+`mise use` は、現在のディレクトリに適用される最も近い設定ファイルに書き込みます。これは親ディレクトリの
+`mise.toml` や、`.tool-versions` ファイルであることもあります。同じディレクトリに `mise.toml` と
+`mise.local.toml` の両方がある場合、mise は `mise.toml` に書き込みます。
+[mise が書き込むファイル](/configuration.html#target-file-for-write-operations) を参照してください。
 
-`mise hook-env` は、変更がない場合はさまざまな状況で早期に終了します。これにより、コマンドを実行するたびに
-シェルプロンプトに遅延が追加されるのを防いでいます。`mise hook-env` を自分で実行して、何が出力されるか確認
-できますが、すでに有効化されているシェルではおそらく何も出力されません。
-
-`mise activate` は（ほとんどのシェルで）`mise` という名前のシェル関数も作成します。これは `mise shell` や
-`mise deactivate` を `eval "$(mise shell)"` で包まなくても動作させるためのトリックです。
-
-## Windows のサポートは？ {#windows-support}
-
-::: warning
-mise は WSL でも問題なく動作しますが、誰かが [powershell](https://github.com/jdx/mise/discussions/6733) 対応を
-追加するまでは、ネイティブ Windows も shim を使う形でサポートされています。
-
-shim を使う必要があるため、[`mise x`（原文）](https://mise.jdx.dev/cli/exec.html) や
-[`mise run`（原文）](https://mise.jdx.dev/cli/run.html) 経由で mise を実行しない限り、`mise.toml` からの
-環境変数は反映されません。
-:::
-
-## mise で http プロキシを使うには？ {#how-do-i-use-mise-with-http-proxies}
-
-簡単に言うと、`http_proxy` と `https_proxy` の環境変数を設定するだけです。これらは小文字である必要があります。
-
-これらの環境変数を使うように設定されていないプラグインでは、動作しない場合があります。特定のツールのインストールで
-プロキシ関連の問題が発生した場合は、そのプラグインのリポジトリに issue を投稿してください。
-
-## プラグインの省略形の名前はどうやってリポジトリに対応づけられるのか？ {#how-do-the-shorthand-plugin-names-map-to-repositories}
-
-例えば、`mise plugin install elixir` はどうやって <https://github.com/asdf-vm/asdf-elixir> を取得すると
-分かるのでしょうか？
-
-mise が基盤として使う省略形の[インデックス](https://github.com/mise-plugins/registry)を管理しています。これは
-mise がリリースされるたびに定期的に更新されます。このリポジトリは
-[registry/](https://github.com/jdx/mise/blob/main/registry/) としてコードベースに直接格納されています。
-
-## 「node@20」は node の最新の利用可能なバージョンを意味するのか？ {#does-node-20-mean-the-newest-available-version-of-node}
-
-コマンドによります。通常、ほとんどのコマンドや設定ファイルの中では、「node@20」は node-20.x の最新の
-_インストール済み_ バージョンを指します。このバージョンは `mise latest --installed node@20` を実行するか、
-`~/.local/share/mise/installs/node/20` のシンボリックリンクが指す先を見ることで確認できます。
+書き込むファイルを自分で選ぶには、次のようにします。
 
 ```sh
-$ ls -l ~/.local/share/mise/installs/node/20
-[...] /home/jdx/.local/share/mise/installs/node/20 -> node-v20.0.0-linux-x64
+mise use --path mise.toml node@24  # this file
+mise use --global node@24          # your global config
+mise use --env local node@24       # mise.local.toml, for personal versions
 ```
 
-これにはいくつか例外があります。例えば次のようなものです。
+`mise use --dry-run node@24` は何が変更されるかを表示し、`mise config ls` は現在のディレクトリで mise が
+読み込む設定ファイルを一覧表示します。
 
-- `mise install node@20`
-- `mise latest node@20`
-- `mise upgrade node@20`
+### `node@20` は最新の Node 20 リリースを使うのか？ {#does-node20-mean-the-newest-available-version-of-node}
 
-これらは node-20.x の最新の _利用可能な_ バージョンを使用します。すでにインストールされているバージョンを
-インストールしたいとは思わないはずなので、これは概ね理にかなっています。
-
-## asdf から移行するには？ {#how-do-i-migrate-from-asdf}
-
-- [はじめに](/getting-started) ガイドの説明に従って mise をインストールし、`mise activate` を設定する
-- シェルの rc ファイルから asdf を削除する
-- asdf の `.tool-versions` ファイルがあるディレクトリで `mise install` を実行すると、mise がツールをインストールする
-
-::: info
-`mise` は `asdf` と違い、`~/.tool-versions` ファイルをグローバルな設定ファイルとは見なさない点に注意してください。
-`mise` はグローバル設定に `~/.config/mise/config.toml` ファイルを使用します。
-:::
-
-グローバルな `.tool-versions` ファイルを mise に移行するために使えるスクリプトの例を示します。
-
-```shell
-mv ~/.tool-versions ~/.tool-versions.bak
-cat ~/.tool-versions.bak | tr -s ' ' | tr ' ' '@' | xargs -n2 mise use -g
-```
-
-mise に慣れてきたら、`.tool-versions.bak` ファイルを削除し、
-[`asdf` をアンインストール](https://asdf-vm.com/manage/core.html#uninstall) できます
-
-## mise は asdf とどの程度互換性があるのか？ {#how-compatible-is-mise-with-asdf}
-
-mise は asdf が使用する `.tool-versions` ファイルをすべて読み込み・インストールできるはずです。asdf のプラグインは
-すべて mise でも使用できます。mise のコマンドは `mise install node@20.0.0` と `asdf install node 20.0.0` のように
-少し異なりますが、これは複数のツールを一度に指定できるようにするためです。ただし、asdf 形式の構文も依然として
-サポートされています（`mise install node 20.0.0`）。ほとんどのコマンドでこれが当てはまりますが、コマンドのヘルプに
-asdf 形式の構文がサポートされていると書かれている場合もあります。迷ったら、まずは asdf の構文を試してみてください。
-おそらく動作します。
-
-::: info
-更新（2025-01-01）: mise は bash で書かれた asdf（0.15 以下）と互換性を持つように設計されました。go で書かれた
-新しい asdf（0.16 以上）には、`asdf set` のように mise がサポートしないコマンドがあります。`mise set` は既存の
-コマンドですが、`asdf set` とは完全に別物です — mise では環境変数を設定するコマンドです。
-
-これは使いやすさの観点で重要というよりは、プラグインのコード内で asdf のコマンドを呼び出しているプラグインが
-動作し続けるようにするためのものです。
-:::
-
-`mise use` のようなコマンドを使うと、あいまいなバージョン指定などにより asdf と互換性のない `.tool-versions`
-ファイルが出力されることがあります。`--pin` または `MISE_PIN=1` を設定すると、`mise use` が `.tool-versions` に
-asdf 互換のバージョンを出力するようになります。あるいは、`mise.toml` と `.tool-versions` を並べて配置することも
-できます。`mise.toml` のツールは、同じディレクトリの `.tool-versions` で定義されたツールを上書きします。
-
-とはいえ、asdf との互換性はもはや一般的な設計目標ではありません。asdf を mise より優先する理由はもはや無いという
-のが長らくの状況であり、ユーザーは移行すべきです。両方を併用しているチームのユーザーも多くいますが、そのような
-構成に関する問題は優先的には対応されない可能性があります。
-
-## CLI のカラー出力を無効化・強制するには？ {#how-do-i-disable-force-cli-color-output}
-
-mise は [console.rs](https://docs.rs/console/latest/console/fn.colors_enabled.html) を使用しており、これは
-[clicolors 仕様](https://bixense.com/clicolors/) に従います。
-
-- `CLICOLOR != 0`: ANSI カラーがサポートされ、プログラムがパイプされていない場合に使用されます。
-- `CLICOLOR == 0`: ANSI カラーのエスケープコードを出力しません。
-- `CLICOLOR_FORCE != 0`: 何があっても ANSI カラーを有効にします。
-
-## mise は安全か？ {#is-mise-secure}
-
-安全なサプライチェーンを提供することは非常に重要です。mise は asdf と比較して、すでにより安全な体験を提供して
-います。セキュリティを重視した評価や貢献を歓迎します。また、ユーザーには使用するプラグインに気を配ることを、
-プラグインの作者には自分が提供しているユーザーに気を配ることを求めています。
-
-詳細は [SECURITY.md](https://github.com/jdx/mise/blob/main/SECURITY.md) を参照してください。
-
-## usage とは？ {#what-is-usage}
-
-usage（<https://usage.jdx.dev/>）は、CLI ツールを定義するための仕様であり CLI です。
-
-引数、オプション、環境変数、設定ファイルはすべて Usage の仕様の中で定義できます。CLI 向けの OpenAPI（swagger）
-のようなものだと考えられます。
-
-`usage` は `mise use -g usage` を使って `mise` でインストールできます。自動補完を動作させるために必要です。
-[自動補完](/installing-mise.html#autocompletion) を参照してください。
-
-ファイルタスクで usage を活用して自動補完を動作させることもできます。
-[ファイルタスクの引数](/tasks/file-tasks.html#arguments) を参照してください。
-
-## pitchfork とは？ {#what-is-pitchfork}
-
-pitchfork（<https://pitchfork.jdx.dev/>）は、開発者向けのプロセスマネージャーです。
-
-失敗時の自動再起動、賢い準備状態チェック、プロジェクトディレクトリに入った際のシェルベースの自動起動・停止、
-定期タスクのための cron 形式のスケジューリングといった機能を備えたデーモン管理を行います。
-
-## VSCode の Windows 拡張機能で `spawn EINVAL` エラーが発生する {#vscode-for-windows-extension-with-error-spawn-einval}
-
-VSCode では、
-[Node.js のセキュリティ修正](https://nodejs.org/en/blog/vulnerability/april-2024-security-releases-2#command-injection-via-args-parameter-of-child_processspawn-without-shell-option-enabled-on-windows-cve-2024-27980---high)
-が原因で、多くの拡張機能が「error spawn EINVAL」を発生させます。
-
-デフォルトの `exe` shim モードでこれは解決するはずです。古いモードを使用している場合は、
-[windows_shim_mode（原文）](https://mise.jdx.dev/configuration/settings.html#windows_shim_mode) を `exe`、
-`hardlink`、`symlink` のいずれかに変更してください。
-
-## `mise install` と `mise use` の違いは？ {#what-is-the-difference-between-mise-install-and-mise-use}
-
-`mise install` はツールのバージョンをダウンロード・インストールしますが、設定ファイルには**追加しません**。
-そのツールが `mise.toml` や `.tool-versions` に既に記載されていない限り、シェルで自動的に有効化されることは
-ありません。
-
-`mise use` はツールをインストール**し**、`mise.toml`（`-g` を付ければ `~/.config/mise/config.toml`）に追加します。
-そのため、ディレクトリに入ると自動的に有効化されます。
-
-プロジェクトのためにツールを固定したいだけなら `mise use` を使ってください。設定ファイルに既に記載されている
-バージョンをインストールしたいなら `mise install` を使ってください。
-
-::: tip
-`mise install node`（バージョン指定なし）は、node が設定に無い場合に**最新**バージョンをインストールします。
-`mise install`（引数なし）は、設定ファイルに記載されているツールだけをインストールします。
-:::
-
-## `latest` は最新のリモートバージョンを意味するのか？ {#does-latest-mean-the-newest-remote-version}
-
-文脈によります。設定ファイルやほとんどのコマンドでは、`latest` は最新の**インストール済み**バージョンに解決
-されます。つまり、node 20.0.0 がインストール済みで node 22.0.0 がリモートで利用可能でも、`latest` は依然として
-20.0.0 を指します。
-
-しかし、一部のコマンドは `latest` を最新の**利用可能な**（リモートの）バージョンに解決します。
-
-- `mise install node@latest` — 最新の利用可能なバージョンをインストールします
-- `mise x node@latest -- node -v` — 最新の利用可能なバージョンを使用します
-- `mise latest node` — 最新の利用可能なバージョンを表示します
-
-最新の利用可能なバージョンにアップグレードし、設定を更新するには、以下を実行します。
+自動的には使いません。プロジェクトが `node = "20"` を指定している場合、mise はすでにインストール済みの
+Node 20 のうち最新のリリースを使います。利用可能なリリースの中から選ぶのは、20.x が1つもインストールされて
+いない場合か、`mise install node@20` や `mise upgrade node` を実行した場合だけです。
 
 ```sh
-mise upgrade node
-# or to also update mise.toml:
-mise upgrade --bump node
+mise latest --installed node@20  # the installed 20.x that mise uses
+mise latest node@20              # the newest 20.x available
+mise upgrade node                # install that release and use it
 ```
 
-## 設定ファイルが無視される / `mise trust` の問題 {#my-config-file-is-being-ignored-mise-trust-issues}
+[ロックファイル（原文）](https://mise.jdx.dev/dev-tools/mise-lock.html) がある場合、mise はそこに記録された
+バージョンを使います。[バージョン指定の解決方法（原文）](https://mise.jdx.dev/dev-tools/versions.html#how-requests-resolve) を参照してください。
 
-mise では、自分が作成していない設定ファイルを信頼する必要があります。安全な設定ファイル — `min_version`、
-単純なバージョン文字列（またはその配列）を持つ `[tools]` エントリ、`[tasks]`（テンプレートやツールオプションを
-含まないもの）だけを含むもの — は、読み込み時にコードを実行するものが何もないため、信頼なしで読み込まれます。
-ツールのインストールやタスクの実行は、`mise install` や `mise run` のような明示的なコマンドでのみ行われます。
-それ以外のすべて（環境変数、フック、設定項目、エイリアス、テンプレート、ツールオプション）は信頼が必要です。
-よくある問題は次のとおりです。
+### `latest` は最新のリリースを意味するのか？ {#does-latest-mean-the-newest-remote-version}
 
-- **誤って信頼を拒否した場合**: mise がファイルを信頼するようプロンプトを出し、そこで「いいえ」と答えると、
-  ignore リストに追加されます。[mise の状態ディレクトリ（原文）](https://mise.jdx.dev/directories.html) にある
-  `ignored-configs` ディレクトリ（デフォルト: `~/.local/state/mise/ignored-configs/`）を確認し、該当する
-  シンボリックリンクを削除すると無視を解除できます。
-- **シンボリックリンクされた設定**: 設定ファイルがシンボリックリンクされている場合（例えば GNU Stow 経由など）、
-  mise はシンボリックリンクの対象パスを追跡することがあります。実際のファイルパスを指定して `mise trust` を
-  試してください。
-- **CI**: CI と検知された環境では、パラノイドモードが有効でない限り、mise は設定ファイルを信頼済みとみなします。
-- **非インタラクティブモード**: CI と検知されない非インタラクティブなシェル（IDE の拡張機能や TTY のない
-  スクリプトなど）では、mise は設定を信頼するかどうかプロンプトを出せません。未信頼の `mise.toml` を直接読み込む
-  コマンドは、untrusted-config エラーで失敗する場合があります。以前に追跡した設定を発見するコマンドは、代わりに
-  未信頼のエントリをスキップすることがあります。事前に `mise trust` を実行するか、信頼する設定についてグローバル
-  設定で [`trusted_config_paths`（原文）](https://mise.jdx.dev/configuration/settings.html#trusted_config_paths) を
-  設定してください。
-- **グローバル設定**（`~/.config/mise/config.toml`）は自動的に信頼されるはずです。そうなっていない場合は、
-  `mise trust ~/.config/mise/config.toml` を明示的に実行してください。
+設定ファイルの中では違います。`node = "latest"` はインストール済みの最新バージョンを使うので、上流で新しい
+リリースが出ても、`mise upgrade node` を実行するまで環境は変わりません。コマンドラインでは、
+`mise install node@latest`、`mise exec node@latest -- node -v`、`mise latest node` はバックエンドに最新の
+リリースを問い合わせます。
 
-`mise doctor`（`mise dr`）を実行すると、未信頼の設定ファイルがあるかどうかを確認できます — 「problems」の下に
-一覧表示されます。
+`latest` が何を意味するかは各バックエンドが決めます。常に最も大きいバージョン番号とは限らず、ほとんどの
+バックエンドはプレリリースを除外します。
+[バージョン指定とバージョンファイル（原文）](https://mise.jdx.dev/dev-tools/versions.html) と
+[ツールのアップグレード](/dev-tools/#upgrade-tools) を参照してください。
 
-## idiomatic バージョンファイル（`.python-version`、`.node-version` など）はどう機能するのか？ {#how-do-idiomatic-version-files-python-version-node-version-etc-work}
+### `mise exec` はどう動作するのか？ {#how-does-mise-exec-work}
 
-idiomatic バージョンファイル（`.python-version`、`.node-version`、`.ruby-version` など）は、mise では
-**デフォルトで無効**になっています。これらは、
-[`idiomatic_version_file_enable_tools`（原文）](https://mise.jdx.dev/configuration/settings.html#idiomatic_version_file_enable_tools)
-を使ってツールごとに明示的に有効化した場合にのみ読み込まれます。
+[`mise exec`（原文）](https://mise.jdx.dev/cli/exec.html) は現在のディレクトリの設定を読み込み、足りない
+ツールをインストールし、プロジェクトのツールと環境変数を使って `--` の後のコマンドを実行します。
 
 ```sh
-# Enable reading .node-version files
-mise settings add idiomatic_version_file_enable_tools node
+mise exec -- node --version          # the Node version the project selects
+mise exec node@24 -- node --version  # Node 24 for this one command
 ```
 
-以前に idiomatic ファイルを有効化していて、mise がそれらを読み込まないようにしたい場合（例えば `uv` が
-`.python-version` を管理しているなど）は、そのツールをリストに追加しないようにするだけです。
+その環境を受け取るのはコマンドとその子プロセスで、シェルは変更されません。
 
-詳細は [idiomatic バージョンファイル](/configuration.html#idiomatic-version-files) を参照してください。
+## シェルとエディター {#shells-and-editors}
 
-## `mise activate`、shim、`mise exec`、`mise env` はどう関係しているのか？ {#how-do-mise-activate-shims-mise-exec-and-mise-env-relate}
+### `mise activate` は何をするのか？ {#what-does-mise-activate-do}
 
-これらはすべて同じ核心的な処理を行います。つまり、mise が管理するツールを使用できるように環境（主に `PATH`）を
-整えます。違いは、_いつ_、_どのように_ それを行うかです。
+`mise activate` はシェル用のスクリプトを出力します。シェルの起動ファイルがそれを実行すると、mise は現在の
+ディレクトリに応じて `PATH` と `[env]` の変数を設定し、各プロンプトの前と、ほとんどのシェルでは各 `cd` の後に
+実行されるフックを追加します。このフックは、今いるディレクトリに合わせて環境を更新し、前のプロジェクトの値を
+取り除きます。有効化によって `mise` というシェル関数も定義され、`mise shell` や `mise deactivate` が現在の
+セッションを変更できるようになります。
 
-| 方法                                 | 動作の仕組み                                            | 向いている用途                             |
-| ------------------------------------ | ------------------------------------------------------ | ------------------------------------------ |
-| `mise activate`                     | シェルプロンプトにフックし、動的に PATH を更新する      | インタラクティブなターミナルでの使用       |
-| `mise activate --shims`             | shim ディレクトリを一度だけ PATH に追加する             | IDE、シンプルな構成（フック・env 未対応）  |
-| `mise exec` / `mise x`              | 環境を整え、単一のコマンドを実行してから終了する        | スクリプト、CI、単発のコマンド             |
-| `mise env`                          | `eval` できる環境変数を出力する                         | 他のツールとの連携                         |
-| `mise run`                          | 環境を整えてからタスクを実行する                        | タスクの実行                               |
-| shim（`~/.local/share/mise/shims`） | 呼び出しごとに mise を呼び出すラッパースクリプト        | 非インタラクティブなシェル、IDE            |
+設定は [シェルのセットアップ（原文）](https://mise.jdx.dev/shell-setup.html) から行ってください。スクリプトや
+CI ジョブではプロンプトが表示されないので、そこでは `mise exec` や `mise run` を使ってください。
 
-::: warning
-`mise activate --shims` は、フック、`[env]` からの環境変数、`watch_files` を**サポートしません**。shim を PATH に
-置くだけです。これらの機能が必要な場合は、（`--shims` なしの）`mise activate` を使用してください。
-:::
+### `mise activate`、shim、`mise exec`、`mise env` はどう関係しているのか？ {#how-do-mise-activate-shims-mise-exec-and-mise-env-relate}
 
-## `mise exec` はどう動作するのか？ {#how-does-mise-exec-work}
+これらは、mise のツールをそれぞれ異なる場所で使えるようにします。`mise activate` はインタラクティブシェルを
+更新し、shim は `PATH` を通じてツールを探すエディターや他のプログラムに対応し、`mise exec` と `mise run` は
+1つのコマンドやタスクのための環境を整え、`mise env` は他のプログラムが読み込むための変数を出力します。比較は
+[mise のツールの使い方を選ぶ](/dev-tools/shims.html#overview) を参照してください。
 
-`mise exec`（または `mise x`）は、設定を読み込み、`PATH` と環境変数を整え、`--` の後に指定したコマンドを
-実行します。
+### mise は Windows で動作するのか？ {#windows-support}
+
+はい。mise は Windows 上でネイティブに動作し、PowerShell での有効化、shim、`mise exec`、`mise run` を
+利用できます。`winget install jdx.mise` でインストールするか、Scoop や Chocolatey については
+[Windows](/installing-mise.html#windows) を参照してください。PowerShell、Git Bash、`cmd.exe` の設定は
+[シェルのセットアップ（原文）](https://mise.jdx.dev/shell-setup.html#windows) を参照してください。
+
+asdf プラグインのツールはネイティブの Windows では動作しません。プラグインがシェルスクリプトだからです。
+コアツールや、aqua、github、http、npm、vfox などのバックエンドは、ツール自体が Windows をサポートしていれば
+動作します。`mise registry <tool>` は、そのツールが使えるバックエンドを一覧表示します。WSL では、Linux 版の
+mise をインストールし、そこで Linux のツールを管理してください。Windows での問題については
+[トラブルシューティング](/troubleshooting.html#windows-problems) を参照してください。
+
+### カラー出力を無効化・強制するには？ {#how-do-i-disable-force-cli-color-output}
+
+カラーを無効にするには `NO_COLOR=1` または `MISE_COLOR=0` を、出力をパイプに渡すときもカラーを維持するには
+`CLICOLOR_FORCE=1` を設定します。
 
 ```sh
-# Uses whatever node version is in your mise.toml
-mise x -- node script.js
-
-# Override with a specific version (useful when it differs from config)
-mise x node@22 -- node script.js
+NO_COLOR=1 mise ls
+CLICOLOR_FORCE=1 mise ls | less -R
 ```
 
-Discord でよく見られるパターンとして、`mise.toml` に既に node@20 が指定されている場合に
-`mise x node@20 -- node script.js` と書くケースがあります。これは動作しますが冗長です — 設定されているバージョンを
-そのまま使いたいだけなら `mise x -- node script.js` の方がシンプルです。
+`NO_COLOR=1` と `MISE_COLOR=0` は `CLICOLOR_FORCE=1` より優先されます。これらの変数が制御するのは mise
+自身の出力です。mise が実行するツールには、それぞれ独自のカラーオプションがあります。
 
-## `mise use` はどこに書き込むのか？ {#where-does-mise-use-write-to}
+## 設定とネットワーク {#configuration-and-networking}
 
-`mise use` は、ディレクトリ階層の中で最も近い `mise.toml` に書き込みます。親ディレクトリに `mise.toml`
-（`-g` の場合は `~/.config/mise/config.toml` を含む）があれば、そのファイルを更新します。
+### 個人用の設定を Git に入れないようにするには？ {#i-don-t-want-to-put-a-mise-toml-tool-versions-file-into-my-project-since-git-shows-it-as-an-untracked-file}
+
+個人用の設定は `mise.local.toml` に置き、共有するツールやタスクはコミットする `mise.toml` に置いてください。
+1つのチェックアウトで `mise.local.toml` を無視するには `.git/info/exclude` に追加し、すべてのプロジェクトで
+無視するにはグローバルな Git の ignore ファイルに追加します。
+
+`mise.toml` 自体を非公開にしておく場合も同じ方法が使えます。あるいは、チームでプロジェクトの `.gitignore` に
+記載することもできます。ignore のルールは未追跡のファイルにしか適用されないので、すでに Git に入っている
+ファイルの変更は隠せません。
+
+### 「nodejs」と「node」（または「golang」と「go」）の違いは？ {#what-is-the-difference-between-nodejs-and-node-or-golang-and-go}
+
+これらは同じツールです。mise は、コマンドライン、`mise.toml`、`.tool-versions` のいずれでも、`nodejs` と
+`golang` を `node` と `go` のエイリアスとして受け付けます。`mise use` が `nodejs` と書かれた `mise.toml` の
+エントリを変更する場合は、コメントを保ったままエントリ名を `node` に変更します。`.tool-versions` には、asdf が
+読み取る名前である `nodejs` と `golang` を書き込みます。
+
+### mise が設定ファイルの信頼を求めるのはなぜか？ {#my-config-file-is-being-ignored-mise-trust-issues}
+
+プロジェクトの設定ファイルはコードを実行できます。テンプレートはコマンドを実行でき、`[env]` のディレクティブや
+フックはスクリプトを実行し、`postinstall` のようなツールオプションはインストール中に実行されます。ツールの
+バージョン、`min_version`、単純なタスクだけを記載したファイルは、mise は確認なしに読み込みます。それ以外の
+ものは信頼されるまで保留されるので、リポジトリをクローンしてそのディレクトリに入っても、そのコードは実行され
+ません。ファイルを読んでから [`mise trust`（原文）](https://mise.jdx.dev/cli/trust.html) を実行してください。
+
+`mise run`、`mise install`、`mise exec`、`mise watch`、および `mise daemons start`、`restart`、`register` は、
+プロジェクトの設定を自ら信頼します。これらを実行すること自体が、そのコードを実行するという判断だからです。
+CI では、mise は設定を信頼済みとして扱います。CI 以外では、`--yes` や `MISE_YES=1` が信頼のプロンプトに
+「はい」と答えるので、確認済みの設定に対してだけ使ってください。
+[パラノイドモード（原文）](https://mise.jdx.dev/paranoid.html) を使うと、この自動的な信頼が無効になります。
+グローバル設定 `~/.config/mise/config.toml` は信頼を必要としません。
+
+mise が設定ファイルを無視しているように見える場合:
+
+- `mise trust --show` を実行すると、現在のディレクトリから上へ向かって、各設定ディレクトリの信頼の状態を確認
+  できます。`mise doctor` は未信頼のファイルを
+  `failed to load config: error parsing config file: <path>` としてしか報告しません。
+- 信頼のプロンプトで「いいえ」と答えた場合、mise はその設定を再度確認せずにスキップします。確認したうえで
+  `mise trust path/to/mise.toml` を実行してください。
+- エディターの拡張機能など端末がない環境では、mise は確認できないため、コマンドは
+  [`Config files in <path> are not trusted`（原文）](https://mise.jdx.dev/errors.html#untrusted-config)
+  で失敗します。先に端末からファイルを信頼してください。
+- `mise.<env>.toml` ファイルは、その [設定環境](/configuration/environments.html) が選択されている場合にのみ
+  読み込まれます。
+
+シンボリックリンクされた設定や、あるディレクトリ配下のすべてのプロジェクトを信頼する方法を含む詳細なルールは、
+[設定の信頼（原文）](https://mise.jdx.dev/security.html#configuration-trust) を参照してください。
+
+### mise は `.nvmrc` や `.python-version` を読み込むのか？ {#how-do-idiomatic-version-files-python-version-node-version-etc-work}
+
+有効にしたツールについてのみ読み込みます。mise は `.nvmrc`、`.node-version`、`.python-version`、
+`.ruby-version` のような他のバージョンマネージャーのファイルを、ツールごとに有効にした後でのみ読み込みます。
 
 ```sh
-mise use node@22           # writes to nearest mise.toml (may be a parent dir!)
-mise use -g node@22        # writes to ~/.config/mise/config.toml
-mise use --path mise.toml node@22  # writes to a specific file
+mise settings add idiomatic_version_file_enable_tools node  # read .nvmrc, .node-version, package.json
+mise settings unset idiomatic_version_file_enable_tools     # stop reading them for every tool
 ```
 
-現在のディレクトリで mise がどの設定ファイルを読み込んでいるかを確認するには `mise cfg` を使用します。
+ツールの他のファイルは有効なまま、特定の1ファイルだけを無効にするには、
+[`idiomatic_version_file_disable_files`（原文）](https://mise.jdx.dev/configuration/settings.html#idiomatic_version_file_disable_files)
+に `node:package.json` のような `tool:file` の組を追加します。各ツールが読み込むファイルについては
+[idiomatic バージョンファイル（原文）](https://mise.jdx.dev/dev-tools/versions.html#idiomatic-version-files) を
+参照してください。
 
-## mise は開発ツールのためのものであり、アプリケーションやシステムパッケージのためのものではない {#mise-is-for-dev-tools-not-applications-or-system-packages}
+### mise は短いツール名をどうやって取得元に対応づけるのか？ {#how-do-the-shorthand-plugin-names-map-to-repositories}
 
-mise は**開発ツールのバージョン**（node、python、go、rust など）と CLI ユーティリティを管理します。`apt`、
-`brew`、`pacman` のようなシステムパッケージマネージャーの代替ではありません。
+mise に同梱されている [レジストリ（原文）](https://mise.jdx.dev/registry.html) が、`ripgrep` のような短い名前を
+`aqua:BurntSushi/ripgrep` のようなバックエンド識別子に対応づけます。そのソースは mise リポジトリの
+[`registry/`](https://github.com/jdx/mise/tree/main/registry) ディレクトリです。ほとんどのツールはプラグインを
+必要としません。
 
-mise が**行わない**こと:
+`mise registry ripgrep` はツールが使えるバックエンドを一覧表示し、`mise tool ripgrep` は mise が選択した
+バックエンドを表示します。
+[mise がバックエンドを選ぶ仕組み（原文）](https://mise.jdx.dev/dev-tools/backends/#how-backend-selection-works) を
+参照してください。
 
-- システムライブラリ（libssl、zlib など）のインストール
-- デスクトップアプリケーションの管理
-- ツールのコンパイルに必要なシステムレベルの依存関係の扱い
+### mise で HTTP プロキシを使うには？ {#how-do-i-use-mise-with-http-proxies}
 
-mise でインストールしたツールがシステムライブラリを必要とする場合は、先に OS のパッケージマネージャーでその
-ライブラリをインストールしてください。
+mise は標準的な `https_proxy`、`http_proxy`、`all_proxy`、`no_proxy` の変数を、小文字・大文字のどちらでも
+読み取ります。
 
-## mise のバージョニングはどう機能するのか？ {#how-does-mise-versioning-work}
+```sh
+export https_proxy=http://proxy.example.com:8080
+mise install
+```
 
-mise は [Calver](https://calver.org/) 形式のバージョニング（`2024.1.0`）を使用しています。破壊的変更は少ないはず
-ですが、発生する場合は可能な限り十分な予告とともに CLI で伝えられます。
+代わりに社内ミラーを経由してダウンロードするには、
+[URL の置き換え（原文）](https://mise.jdx.dev/url-replacements.html) を使ってください。npm、pip、cargo、asdf
+プラグインなど、mise が実行するパッケージマネージャーやプラグインは、それぞれ独自のプロキシと証明書の設定を
+読み取ります。
 
-大きなリリースでの変更を伝えるための SemVer のメジャーリリースを設けるのではなく、新機能や変更は
-`experimental = true` のような設定でオプトインできます。これにより、プラグインの作者やユーザーはメジャーリリースを
-待たずに、新しい機能をすぐに試せます。
+## asdf からの移行 {#migration}
 
-Calver（YYYY.MM.RELEASE）の数字は、単純にリリースの日付を表しているだけで、互換性や追加された新機能の数を表す
-ものではありません。各リリースは小さく、段階的なものになります。
+### asdf から切り替えるには？ {#how-do-i-migrate-from-asdf}
+
+<a id="how-compatible-is-mise-with-asdf"></a>
+
+mise は `.tool-versions` ファイルを読み込むので、シェルの設定を変える前に1つのプロジェクトで試すことができ、
+チームメンバーは asdf を使い続けられます。[asdf からの移行](/dev-tools/comparison-to-asdf.html) では、手順、
+コマンドの対応関係、asdf ユーザーと `.tool-versions` を共有する方法を説明しています。最初に知っておくべき違いが
+1つあります。`mise set` は環境変数を設定するコマンドで、ツールのバージョンを選ぶのは `mise use` です。
+
+## 対象範囲と関連ツール {#scope-and-related-tools}
+
+### mise はシステムパッケージや、mise なしで動くツールをインストールできるのか？ {#mise-is-for-dev-tools-not-applications-or-system-packages}
+
+<a id="how-do-i-install-tools-other-users-can-run-without-mise"></a>
+
+`[tools]` は、ディレクトリを移動するたびに mise が切り替える、プロジェクトごとのバージョンのためのものです。
+システムライブラリ、デスクトップアプリ、他のユーザーが mise なしで実行するコマンドなど、マシン全体に一度だけ
+インストールするものには、次のいずれかを使ってください。
+
+- [`[bootstrap.packages]`（原文）](https://mise.jdx.dev/bootstrap/packages/) は apt、dnf、Homebrew、WinGet
+  などのパッケージマネージャー向けのパッケージを宣言し、`mise bootstrap` がそれらをインストールします。
+  `brew:` と `brew-cask:` のエントリは mise 自身がインストールするので、Homebrew をインストールしておく必要は
+  ありません。[Homebrew のフォーミュラ（原文）](https://mise.jdx.dev/bootstrap/packages/brew.html) を参照してください。
+- [`mise install-into`（原文）](https://mise.jdx.dev/cli/install-into.html) は、mise がサポートする任意の
+  ツールの1つのバージョンを、指定したディレクトリにインストールします。
+
+  ```sh
+  mise install-into node@24 ~/standalone-node
+  ~/standalone-node/bin/node --version
+  ```
+
+  新しいディレクトリか空のディレクトリを使ってください。`install-into` はすでにある内容を、確認したうえで、
+  または `--yes` の場合は確認なしに削除します。その `bin` ディレクトリを `PATH` に追加し、`JAVA_HOME` などの
+  変数は自分で設定してください。
+
+どちらの方法でも、すべてのユーザーに1つのバージョンが提供され、プロジェクトごとの切り替えはありません。代わりに
+各ユーザーに mise が管理するツールを提供するには、それらを `[tools]` に記載したままにし、
+[`mise bootstrap`（原文）](https://mise.jdx.dev/bootstrap.html) に各ユーザーの有効化とツールをセットアップさせて
+ください。
+
+### mise は安全か？ {#is-mise-secure}
+
+mise は、バックエンドが対応している場合はダウンロードを検証し、プロジェクトの設定にあるコードを実行する前に
+確認を求めます。また、より厳しい制限のためのセーフモードとパラノイドモードがあります。各検証が何を対象とするかは
+バックエンドによって異なります。[セキュリティ（原文）](https://mise.jdx.dev/security.html) を参照し、脆弱性は
+[脆弱性の報告（原文）](https://mise.jdx.dev/security.html#reporting-a-vulnerability) の説明に従って報告して
+ください。
+
+### usage とは？ {#what-is-usage}
+
+[usage](https://usage.jdx.dev/) は、コマンドの引数、オプション、自動補完を記述するための spec です。mise には
+これが組み込まれています。タスクの引数、`mise run <task> --help`、mise とそのタスクの自動補完はすべて usage の
+spec から生成されるので、別途 `usage` CLI をインストールする必要はありません。
+[タスクの引数（原文）](https://mise.jdx.dev/tasks/task-arguments.html) を参照してください。
+
+### pitchfork とは？ {#what-is-pitchfork}
+
+[pitchfork](https://pitchfork.jdx.dev/) は、開発用サービスのためのプロセススーパーバイザーです。mise の実験的な
+[デーモン（原文）](https://mise.jdx.dev/daemons.html) 機能はこれを使って、`mise.toml` で宣言されたデータベースや
+開発サーバーを実行し、準備ができているかを確認し、再起動します。終了するコマンドには [タスク](/tasks/) を、
+動き続けるプロセスにはデーモンを使ってください。
+
+### mise のバージョニングはどう機能するのか？ {#how-does-mise-versioning-work}
+
+mise は `2026.10.4` のようなカレンダーバージョンを使っており、その数字は互換性について何も表しません。
+[バージョン番号（原文）](https://mise.jdx.dev/releases.html#versioning) を参照してください。

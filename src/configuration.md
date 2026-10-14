@@ -1,653 +1,445 @@
 ---
 title: mise.toml
+description: "Configure tools, environment variables, and tasks in mise.toml, and control where mise finds and writes config files."
+socialDescription: "Configure tools, environment variables, and tasks in mise.toml, and where mise finds config files."
 upstreamPath: docs/configuration.md
 upstreamUrl: https://mise.jdx.dev/configuration.html
-upstreamRef: 1c7db9f9
-upstreamDate: "2026-08-12"
+upstreamRef: 5749c813
+upstreamDate: "2026-10-13"
 ---
 
-# 設定 {#configuration}
+# mise.toml {#mise-toml-reference}
 
-`mise.toml` ファイル、環境変数、さまざまな設定オプションを使って、開発環境を管理するために mise をプロジェクト向けに設定する方法を説明します。
+プロジェクトの `mise.toml` は、そのプロジェクトが必要とするツール、環境変数、タスクを宣言します。mise はこれを、グローバル設定や親ディレクトリにある設定ファイルと組み合わせます。
 
-## `mise.toml` {#mise-toml}
-
-`mise.toml` は mise の設定ファイルです。以下のいずれかのファイルパスに置くことができます（優先順位の高い順に並んでおり、上にあるものが下にあるものの設定を上書きします）。
-
-- `mise.local.toml` - ローカル設定用。バージョン管理にコミットすべきではありません
-- `mise.toml`
-- `mise/config.toml`
-- `.mise/config.toml`
-- `.config/mise.toml` - 設定ファイルを共通のディレクトリにまとめる場合に使用します
-- `.config/mise/config.toml`
-- `.config/mise/conf.d/*.toml` - このディレクトリ内のすべてのファイルがアルファベット順に読み込まれます
-
-::: tip
-[`mise cfg`（原文）](https://mise.jdx.dev/cli/config.html) を実行すると、お使いの環境で mise がどの順序でファイルを読み込んでいるかを確認できます。これは、mise のルールを自分で解読するよりもずっと簡単な場合が多いです。
-:::
-
-補足:
-
-- `mise` で始まるパスはドットファイルにできます。例えば `.mise.toml` や `.mise/config.toml` です。
-- このリストには [設定環境](/configuration/environments) は含まれていません。設定環境を使うと、`mise.development.toml` のような環境固有の設定ファイルを利用できます（`MISE_ENV=development` で設定します）。`mise.windows.toml` や `mise.macos-arm64.toml` のようなプラットフォーム固有の環境は、[`auto_env` 設定項目](/configuration/environments.html#platform-environments) で自動的に有効化できます。
-- これらのパスとその優先順位に関する実際のコードは、[`src/config/mod.rs` 内の `LOCAL_CONFIG_FILENAMES`](https://github.com/jdx/mise/blob/main/src/config/mod.rs) を参照してください。簡潔にするため、一部の旧来のパスはここには記載していません。
-
-## 設定の階層 {#configuration-hierarchy}
-
-mise は、複数のソースから設定項目をマージする高度な階層的設定システムを採用しています。この階層を理解することで、開発環境を効果的に整理できます。
-
-### 設定のマージがどのように機能するか {#how-configuration-merging-works}
-
-これらのファイルは上位のディレクトリへ再帰的に探索されます。そのため `~/src/work/myproj/mise.toml` ファイルがある場合、そこで定義された内容が
-`~/src/work/mise.toml` や `~/.config/mise.toml` で設定された内容を上書きします。設定内容はマージされます。
-
-### 設定の解決プロセス {#configuration-resolution-process}
-
-mise が設定を必要とするとき、以下のプロセスに従います。
-
-1. 現在の場所からルート（または `MISE_CEILING_PATHS`）まで**ディレクトリツリーを上へたどります**
-2. その途中で見つかったすべての設定ファイルを**収集します**
-3. より具体的な（現在のディレクトリに近い）設定項目が、より広範な設定項目を上書きする形で、**順番にマージします**
-4. `MISE_ENV` が設定されている場合、`mise.dev.toml` のような**環境固有の設定を適用します**
-
-### 設定階層の可視化 {#visual-configuration-hierarchy}
-
-```
-/
-├── etc/mise/                         # System-wide config (lowest precedence)
-│   ├── conf.d/*.toml                 # System fragments, loaded alphabetically
-│   ├── config.toml                   # System defaults
-│   └── config.<env>.toml             # Env-specific system config (MISE_ENV or -E)
-└── home/user/
-    ├── .config/mise/
-    │   ├── conf.d/*.toml             # User fragments, loaded alphabetically
-    │   ├── config.toml               # Global user config
-    │   ├── config.<env>.toml         # Env-specific user config
-    │   ├── config.local.toml         # User-local overrides
-    │   └── config.<env>.local.toml   # Env-specific user-local overrides
-    └── work/
-        ├── mise.toml                 # Work-wide settings
-        └── myproject/
-            ├── mise.local.toml       # Local overrides (git-ignored)
-            ├── mise.toml             # Project config
-            ├── mise.<env>.toml       # Env-specific project config
-            ├── mise.<env>.local.toml # Env-specific project local overrides
-            └── backend/
-                └── mise.toml         # Service-specific config (highest precedence)
-```
-
-### セクションごとのマージの振る舞い {#merge-behavior-by-section}
-
-設定のセクションによって、マージの方法は異なります。
-
-**ツール**（`[tools]`）: 追加的で上書きされる
-
-```toml
-# Global: node@18, python@3.11
-# Project: node@20, go@1.21
-# Result: node@20, python@3.11, go@1.21
-```
-
-**環境変数**（`[env]`）: 追加的で上書きされる
-
-```toml
-# Global: NODE_ENV=development
-# Project: NODE_ENV=production, API_URL=localhost
-# Result: NODE_ENV=production, API_URL=localhost
-```
-
-**タスク**（`[tasks]`）: タスクごとに完全に置き換えられる
-
-```toml
-# Global: [tasks.test] = "npm test"
-# Project: [tasks.test] = "yarn test"
-# Result: "yarn test" (completely replaces global)
-```
-
-**設定項目**（`[settings]`）: 追加的で上書きされる
-
-```toml
-# Global: experimental = true
-# Project: jobs = 4
-# Result: experimental = true, jobs = 4
-```
-
-::: tip
-`mise config` を実行すると、mise が優先順位の順に読み込んだファイルを確認できます。
-:::
-
-### 書き込み操作の対象ファイル {#target-file-for-write-operations}
-
-[`mise use`（原文）](https://mise.jdx.dev/cli/use.html)、[`mise set`（原文）](https://mise.jdx.dev/cli/set.html)、[`mise unuse`（原文）](https://mise.jdx.dev/cli/unuse.html) のようなコマンドが設定ファイルに書き込む必要がある場合、**最も優先順位の高いディレクトリの中で、最も優先順位の低いファイル**を使用します。つまり:
-
-- `mise.toml` と `mise.local.toml` の両方が存在する場合、書き込みは `mise.toml` に対して行われます
-- `mise.toml` と `mise.production.toml` の両方が存在する場合、書き込みは `mise.toml` に対して行われます
-- `mise.local.toml` のみが存在する場合、書き込みは `mise.local.toml` に対して行われます
-
-この振る舞いにより、共有設定（`mise.toml`）はデフォルトで更新される一方、ローカルの上書き設定（`mise.local.toml`）や環境固有の設定は、明示的に指定しない限り変更されないことが保証されます。
-
-::: info 例
-
-```bash
-# With both mise.toml and mise.local.toml present:
-$ mise use node@22              # writes to mise.toml
-$ mise use --env local node@20  # writes to mise.local.toml
-$ mise set NODE_ENV=production  # writes to mise.toml
-```
-
-:::
-
-典型的な `mise.toml` は次のようになります。
-
-```toml
+```mise-toml [mise.toml]
 [tools]
-node = '24'
-python = '3.12'
+node = "24"
 
 [env]
-NODE_ENV = 'development'
+NODE_ENV = "development"
 
-[tasks.dev]
-run = 'npm run dev'
-
-[tasks.test]
-run = 'pytest'
+[tasks.hello]
+run = "node --eval 'console.log(process.env.NODE_ENV)'"
 ```
 
-`mise.toml` ファイルは階層的です。現在のディレクトリにあるファイルの設定は、親ディレクトリにある競合する設定を
-上書きします。例えば、`~/src/myproj/mise.toml` が以下のように定義しているとします。
+`mise run hello` を実行すると、Node.js がなければインストールしたうえで `development` を出力します。[`mise config`（原文）](https://mise.jdx.dev/cli/config.html) を実行すると mise が読み込んだ設定ファイルの一覧を、`mise ls --current` を実行すると選択されたツールのバージョンを確認できます。
+
+| 設定する内容                                      | リファレンス                                                                                   |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| ツールのバージョンとインストールオプション        | [開発ツール](/dev-tools/)                                                                      |
+| コマンドに渡す環境変数                            | [環境変数](/environments/)                                                                     |
+| テンプレート内で再利用する値                      | [設定変数（原文）](https://mise.jdx.dev/configuration/vars.html)                               |
+| 開発・テスト・本番用のオーバーレイ                | [設定環境](/configuration/environments.html)                                                   |
+| コマンドとその依存関係                            | [タスク](/tasks/)                                                                              |
+| `cd` 時、インストール時、変更時に実行するコマンド | [フック（原文）](https://mise.jdx.dev/hooks.html)                                              |
+| マシンがプロジェクトをビルドできるかのチェック    | [プロジェクト診断（原文）](https://mise.jdx.dev/configuration/project-diagnostics.html)        |
+| 長時間動作するサービス                            | [デーモン（原文）](https://mise.jdx.dev/daemons.html)                                          |
+| mise 自体の動作                                   | [設定項目（原文）](https://mise.jdx.dev/configuration/settings.html)                           |
+
+[トップレベルキー](#top-level-keys) に、`mise.toml` に含められるすべてのセクションを示します。
+
+## 設定ファイルの組み合わせ方 {#configuration-hierarchy}
+
+mise は次の順序で設定を読み込み、後のファイルが前のファイルを上書きします。
+
+1. `/etc/mise` にあるシステム設定。
+2. `~/.config/mise` にあるグローバル設定。
+3. ファイルシステムのルートから現在のディレクトリまでの、各ディレクトリにある設定ファイル。[`ceiling_paths`（原文）](https://mise.jdx.dev/configuration/settings.html#ceiling_paths) が設定されている場合、探索は最も近い ceiling ディレクトリの下から始まります。ceiling ディレクトリ自体にあるファイルは読み込まれません。
+
+そのため、深いディレクトリにあるファイルが親ディレクトリにあるファイルを上書きします。各ディレクトリで、mise は [設定ファイルの場所](#mise-toml) にあるファイルを読み込み、どれが優先されるかはその表の順序で決まります。[設定環境](/configuration/environments.html) を選択すると、この探索の各階層に環境ファイルが追加されます。親ディレクトリにある環境ファイルは、子ディレクトリにある通常のファイルを上書きしません。
+
+```text
+/
+├── etc/mise/                         # system config (lowest precedence)
+│   ├── conf.d/*.toml
+│   ├── config.toml
+│   └── config.<env>.toml
+└── home/user/
+    ├── .config/mise/                 # global config
+    │   ├── conf.d/*.toml
+    │   ├── config.toml
+    │   ├── config.<env>.toml
+    │   ├── config.local.toml
+    │   └── config.<env>.local.toml
+    └── work/
+        ├── mise.toml                 # shared by every project in work/
+        └── myproject/
+            ├── mise.toml             # project config
+            ├── mise.<env>.toml       # environment config
+            ├── mise.local.toml       # personal overrides, not committed
+            ├── mise.<env>.local.toml
+            └── backend/
+                └── mise.toml         # nearest file (highest precedence)
+```
+
+値はファイル全体を置き換えるのではなく、マージされます。次の 3 つのファイルがある場合、`~/src/app` で作業すると、mise は `mise.local.toml` の `node` のリクエストと、グローバル設定の `python` のリクエストを使用します。
+
+::: code-group
+
+```toml [~/.config/mise/config.toml]
+[tools]
+node = "22"
+python = "3.13"
+```
+
+```toml [~/src/app/mise.toml]
+[tools]
+node = "24"
+```
+
+```toml [~/src/app/mise.local.toml]
+[tools]
+node = "25"
+```
+
+:::
+
+これらはバージョン指定であり、mise はその後これを具体的なバージョンに解決します。
+
+### セクションごとのマージ方法 {#merge-behavior-by-section}
+
+| セクション           | ファイルの組み合わせ方                                                                                                                                                                                                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[tools]`            | ツールごと。最も近いファイルのエントリが、オプションを含めてそのツールのエントリ全体を置き換えます。他のツールは継承されます。                                                                                                                                                         |
+| `[env]`              | 変数ごと。最も近いファイルが優先されます。[環境変数](/environments/) を参照してください。                                                                                                                                                                                              |
+| `[vars]`             | 変数ごと。最も近いファイルが優先されます。                                                                                                                                                                                                                                             |
+| `[settings]`         | 設定項目ごと。                                                                                                                                                                                                                                                                         |
+| `[tasks]`            | タスク名ごと。より近いディレクトリのタスクが親のタスクを置き換えます。同じディレクトリ内では、`run`、`run_windows`、`file` のいずれも持たないブロックは、置き換えではなくメタデータを追加します。[どの定義が優先されるか（原文）](https://mise.jdx.dev/tasks/task-discovery.html#which-definition-wins) を参照してください。 |
+| `[tool_config]`      | マージされません。同じ [設定ルート](#config-root) で宣言されたツールにのみ適用されます。                                                                                                                                                                                               |
+| `[secrets.*]`        | フィールドごと。最も近いプロジェクトファイルが優先されます。グローバル設定では無視されます。                                                                                                                                                                                           |
+| `[daemons]`          | デーモンごと。最も近い宣言がデーモン全体を置き換えます。                                                                                                                                                                                                                               |
+| `[daemons_settings]` | キーごと。子プロジェクトに継承されます。グローバル設定とシステム設定では無視されます。                                                                                                                                                                                                 |
+
+## 設定ファイルの場所 {#mise-toml}
+
+これらは、mise が探索する各ディレクトリ（ファイルシステムのルートから現在のディレクトリまで）で探すファイル名です。同じディレクトリ内では、表の上にあるファイルが下にあるファイルを上書きします。システム設定とグローバル設定は、[グローバル設定とシステム設定](#global-config) にある名前を使用します。
+
+| ファイル                          | 用途                                                                                                         |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `mise.local.toml`                 | 個人用の上書き。バージョン管理には含めないでください。                                                       |
+| `mise.toml`                       | 共有するプロジェクト設定                                                                                     |
+| `mise/config.toml`                | `mise/` ディレクトリ内のプロジェクト設定                                                                     |
+| `mise/conf.d/*/mise.toml`         | `mise/` 内のディレクトリフラグメント。[conf.d 内のディレクトリ](#conf-d-folders) を参照                      |
+| `mise/conf.d/*.toml`              | アルファベット順に読み込まれる設定フラグメント。[conf.d](#conf-d) を参照                                     |
+| `.mise/config.toml`               | 隠しディレクトリ `.mise/` 内のプロジェクト設定                                                               |
+| `.mise/conf.d/*/mise.toml`        | `.mise/` 内のディレクトリフラグメント                                                                        |
+| `.mise/conf.d/*.toml`             | `.mise/` 内のフラグメント                                                                                    |
+| `.config/mise.toml`               | `.config/` 配下のプロジェクト設定                                                                            |
+| `.config/mise/mise.toml`          | `.config/mise/` 内のプロジェクト設定                                                                         |
+| `.config/mise/config.toml`        | `.config/mise/` 内のプロジェクト設定                                                                         |
+| `.config/mise/conf.d/*/mise.toml` | `.config/mise/` 内のディレクトリフラグメント                                                                 |
+| `.config/mise/conf.d/*.toml`      | `.config/mise/` 内のフラグメント                                                                             |
+| `.tool-versions`                  | [`.tool-versions` 形式（原文）](https://mise.jdx.dev/dev-tools/versions.html#tool-versions) のツールバージョン |
+
+- `mise.toml` と `mise.local.toml` はドットファイルとしても機能します。`.mise.toml` は `mise.toml` を、`.mise.local.toml` は `mise.local.toml` を上書きします。
+- 各 `config.toml` の隣には `.config/mise/config.local.toml` のように `config.local.toml` を、それ以外の各 `mise.toml` の隣には `.config/mise.local.toml` のように `mise.local.toml` を置けます。ローカルファイルはすべて、同じディレクトリにあるすべての共有ファイルを上書きします。
+- `mise.production.toml` のような環境ファイルは、その環境が選択されている場合に共有ファイルを上書きし、さらにローカルファイルがそれを上書きします。`mise.production.local.toml` のような環境ローカルファイルは、これらすべてを上書きします。複数の環境が選択されている場合、同じ種類のファイルでは、後の環境のファイルが前の環境のファイルを上書きします。[設定環境](/configuration/environments.html#file-names-and-precedence) を参照してください。
+- [`override_config_filenames`（原文）](https://mise.jdx.dev/configuration/settings.html#override_config_filenames) 設定項目は、このリストの TOML の名前を独自の名前に置き換えます（環境ファイルは引き続き読み込まれます）。また、[`override_tool_versions_filenames`（原文）](https://mise.jdx.dev/configuration/settings.html#override_tool_versions_filenames) は `.tool-versions` を置き換えます。[`default_config_filename`（原文）](https://mise.jdx.dev/configuration/settings.html#default_config_filename) は、mise が作成するファイルの名前を変更します。
+
+`mise config` は、mise が読み込んだファイルを優先順位の低い順に一覧表示します。後のファイルが前のファイルを上書きします。
+
+## conf.d による設定の分割 {#conf-d}
+
+`conf.d` ディレクトリに `*.toml` ファイルを置くと、設定をトピックごとに分割できます。mise はこれらをアルファベット順に、そのディレクトリ自身の `config.toml` より前に読み込むため、`config.toml` がフラグメントを上書きします。これはプロジェクト内の `mise/conf.d`、`.mise/conf.d`、`.config/mise/conf.d`、およびグローバル（`~/.config/mise/conf.d`）とシステム（`/etc/mise/conf.d`）のディレクトリで機能します。名前が `.` で始まるファイルはスキップされます。
+
+`node.tools.toml` のようにフラグメント名にドットを含めることは非推奨です。ファイル名を `node-tools.toml` に変更してください。[conf.d の環境](/configuration/environments.html#conf-d-environments) を参照してください。
+
+### conf.d 内のディレクトリ {#conf-d-folders}
+
+`conf.d` ディレクトリ内のディレクトリは、設定をそれが使うファイルの隣に置いておけるフラグメントです。
+
+```text
+~/.config/mise/conf.d/
+├── git.toml                  # single-file fragment
+└── git-tools/                # folder fragment
+    ├── mise.toml             # always loaded
+    ├── mise.local.toml       # always loaded, usually gitignored
+    ├── mise.linux.toml       # loaded when the linux environment is active
+    ├── mise.linux.local.toml
+    └── gitconfig
+```
+
+このディレクトリは、その中のファイルにとっての [設定ルート](#config-root) です。[dotfile（原文）](https://mise.jdx.dev/dotfiles.html) のソースとして指定した `"gitconfig"` のような相対パスはこのディレクトリ内で解決され、<code v-pre>{{ config_root }}</code> はこのディレクトリのパスになり、ここで定義されたタスクはデフォルトでこのディレクトリで実行されます。このディレクトリはシンボリックリンクでもよいため、dotfiles のチェックアウトは独自のレイアウトを保てます。
+
+```sh
+ln -s ~/src/dotfiles/git ~/.config/mise/conf.d/git-tools
+```
+
+mise はこのディレクトリから `mise.toml`、`mise.local.toml`、`mise.<env>.toml`、`mise.<env>.local.toml` のみを読み込み、再帰的には探索しません。名前が `.` で始まるディレクトリは無視されます。`mise.<env>.toml` ファイルは、明示的な [設定環境](/configuration/environments.html) と [プラットフォーム環境](/configuration/environments.html#platform-environments) で読み込まれ、`env_conf_d` の移行の影響を受けません。
+
+ディレクトリフラグメントは、同じ `conf.d` ディレクトリ内の単一ファイルのフラグメントの後に、ディレクトリ名のアルファベット順で、そのディレクトリ自身の設定（`config.toml` など）より前に読み込まれます。その環境ファイルは、`conf.d/<name>.<env>.toml` や `conf.d/<name>.<env>.local.toml` が占めるのと同じ位置に入ります。ディレクトリフラグメントの `mise.local.toml` は、親ディレクトリ自身の `config.local.toml` の直前に読み込まれます。つまり、[環境ファイルの順序](/configuration/environments.html#file-names-and-precedence) に従い、ディレクトリフラグメントと親ディレクトリの `.<env>.toml` ファイルは上書きしますが、それらの `.<env>.local.toml` ファイルは上書きしません。プロジェクトのディレクトリフラグメントで宣言されたツールは、プロジェクトのロックファイルを共有します。
+
+タスクについては、ディレクトリフラグメントはそれ自体がルートになります。その `[task_config]` はそのディレクトリフラグメントが定義するタスクにのみ適用され、`task_config.includes = ["tasks"]` は、`~/.config/mise/tasks` のような周囲の設定のデフォルトのタスクディレクトリを置き換えることなく、ディレクトリフラグメントの `tasks/` ディレクトリからファイルタスクを読み込みます。周囲の設定が `cascade = true` で設定した `[task_config]` の値は、`includes` を除いて引き続き適用されます。ディレクトリフラグメントと他の設定が同じ名前のタスクを定義している場合は、優先順位の高いファイルのタスクが優先されます。また、`.mise/tasks` のようなデフォルトのタスクディレクトリでのみ見つかったタスクは、設定ファイルが定義するタスクに負けます。[タスクの探索と優先順位（原文）](https://mise.jdx.dev/tasks/task-discovery.html) を参照してください。
+
+## グローバル設定とシステム設定 {#global-config}
+
+グローバル設定はすべてのディレクトリに適用されます。グローバル設定は `~/.config/mise`（[`MISE_CONFIG_DIR`（原文）](https://mise.jdx.dev/directories.html#config-mise)）にあり、通常は `config.toml` に記述します。このディレクトリには、`mise.toml`、`conf.d/` のフラグメント、マシン固有の値のための `config.local.toml`、`config.work.toml` のような環境ファイルも置けます。`mise use --global` と `mise settings` はここに書き込みます。
+
+```toml [~/.config/mise/config.toml]
+[tools]
+node = "lts"
+python = ["3.14", "3.13"]
+
+[settings]
+idiomatic_version_file_enable_tools = ["node"]
+trusted_config_paths = ["~/work"]
+
+[settings.status]
+show_env = false
+show_tools = false
+```
+
+グローバル設定は、いくつかの点でプロジェクト設定と異なります。
+
+- [設定ルート](#config-root) はホームディレクトリ、または [`global_config_root`（原文）](https://mise.jdx.dev/configuration/settings.html#global_config_root) です。
+- `[secrets.*]` と `[daemons_settings]` はグローバル設定では無視され、`[daemon_providers]` はグローバル設定でのみ使用できます。
+- [`global_config_file`（原文）](https://mise.jdx.dev/configuration/settings.html#global_config_file)（`MISE_GLOBAL_CONFIG_FILE`）は、これらすべてのファイルを 1 つのファイルに置き換えます。
+
+システム設定はマシン上のすべてのユーザーに適用され、優先順位が最も低くなります。システム設定は `/etc/mise`（[`MISE_SYSTEM_CONFIG_DIR`（原文）](https://mise.jdx.dev/directories.html#system-config)）にあり、`/etc/mise/config.toml` のように、グローバルディレクトリと同じファイル名を受け付けます。[`system_config_file`（原文）](https://mise.jdx.dev/configuration/settings.html#system_config_file)（`MISE_SYSTEM_CONFIG_FILE`）は、これらを単一のファイルに置き換えます。
+
+## mise が書き込むファイル {#target-file-for-write-operations}
+
+[`mise use`（原文）](https://mise.jdx.dev/cli/use.html)、[`mise set`（原文）](https://mise.jdx.dev/cli/set.html)、[`mise unset`（原文）](https://mise.jdx.dev/cli/unset.html)、`mise settings --local`、[`mise tasks add`（原文）](https://mise.jdx.dev/cli/tasks/add.html) がプロジェクト設定を変更するときは、設定がある最も近いディレクトリの中で、最も優先順位の低いファイルに書き込みます。デフォルトでは共有設定が更新され、個人用のファイルや環境ファイルは明示的に指定した場合にのみ変更されます。
+
+```sh
+# In a directory with mise.toml and mise.local.toml:
+mise use node@24                # writes mise.toml
+mise set NODE_ENV=production    # writes mise.toml
+mise use --env local node@25    # writes mise.local.toml
+mise use --env staging node@24  # writes mise.staging.toml
+```
+
+ディレクトリに `mise.local.toml` しかない場合、書き込みは `mise.local.toml` に対して行われます。設定のないサブディレクトリからは、親ディレクトリのファイルに書き込まれます。設定ファイルを持つディレクトリがない場合、mise は現在のディレクトリに `mise.toml` を作成します。ホームディレクトリでは、代わりにグローバル設定に書き込みます。グローバル設定に書き込むには `--global` を、ファイルを選ぶには `--path` を使用します。
+
+他のコマンドは、別の方法で書き込み先を選びます。
+
+- [`mise config get`（原文）](https://mise.jdx.dev/cli/config/get.html) と [`mise config set`（原文）](https://mise.jdx.dev/cli/config/set.html) は、読み込まれた TOML ファイルのうち最も優先順位の高いものを使用します。これは `mise.local.toml` になることもあります。別のプロジェクトファイルを選ぶには `--file` を使用します。
+- [`mise unuse`（原文）](https://mise.jdx.dev/cli/unuse.html) は、指定されたツールを宣言している設定のうち、最初に読み込まれたものを使用します。バージョンを指定した引数は、設定されたリクエストと文字どおりに照合されます。`node@20` は `node = "20"` に一致しますが、`node = "20.0.0"` には一致しません。ファイルを選ぶには `--path` を使用します。
+
+### グローバルな書き込みを別のファイルに振り分ける {#global-section-write-targets}
+
+グローバルなツール、ブートストラップのパッケージ、dotfiles を別々のファイルで管理するには、[`write_targets`（原文）](https://mise.jdx.dev/configuration/settings.html#write_targets) でそれぞれの書き込み先を設定します。
+
+```toml [~/.config/mise/config.toml]
+[settings.write_targets]
+tools = "~/.config/mise/conf.d/10-tools.toml"
+packages = "~/.config/mise/conf.d/20-packages.toml"
+dotfiles = "~/.config/mise/conf.d/30-dotfiles.toml"
+```
+
+すると、`mise use --global`、`mise bootstrap packages use --global`、`mise bootstrap packages import --global`、`mise dotfiles add`（デフォルトでグローバル設定に書き込みます）による新しい宣言は、それらのファイルに書き込まれます。書き込み先は、mise がグローバル設定ディレクトリから読み込むファイル（`config.toml`、`mise.toml`、または `conf.d` のフラグメント）への絶対パス（または `~/` で始まるパス）でなければなりません。`~/.config/mise/tools.toml` のようなパスは読み込まれないため、mise はこれを拒否します。
+
+移動するのは新しいエントリだけです。既存のツール、パッケージ、dotfile は、それを宣言しているファイルに残ります。また、1 つのコマンドが複数のグローバルファイルにあるエントリを更新する場合、mise は処理を止めて `--path` の指定を求めます。`--path` は常に優先され、`mise use --env staging` のようなプロジェクトへの書き込みは影響を受けません。書き込み先が設定されていないものは、通常のグローバル設定ファイルを使用します。
+
+## .miserc.toml {#miserc}
+
+`.miserc.toml` は、どの [設定環境](/configuration/environments.html) を読み込むかなど、mise が設定ファイルを探す前に必要とする設定項目を保持します。mise はどの `mise.toml` よりも先にこれを読み込むため、これらの値を `mise.toml` の `[settings]` で設定しても、設定ファイルの探索には影響しません。
+
+```toml [.miserc.toml]
+env = ["development"]
+```
+
+受け付けるキーは次のものだけです: [`env`（原文）](https://mise.jdx.dev/configuration/settings.html#env)、[`auto_env`（原文）](https://mise.jdx.dev/configuration/settings.html#auto_env)、[`env_conf_d`（原文）](https://mise.jdx.dev/configuration/settings.html#env_conf_d)、[`ceiling_paths`（原文）](https://mise.jdx.dev/configuration/settings.html#ceiling_paths)、[`ignored_config_paths`（原文）](https://mise.jdx.dev/configuration/settings.html#ignored_config_paths)、[`override_config_filenames`（原文）](https://mise.jdx.dev/configuration/settings.html#override_config_filenames)、[`override_tool_versions_filenames`（原文）](https://mise.jdx.dev/configuration/settings.html#override_tool_versions_filenames)。JSON スキーマは [schema/miserc.json](https://github.com/jdx/mise/blob/main/schema/miserc.json) です。`ignored_config_paths` 内の相対パスは、その `.miserc.toml` ファイルがあるディレクトリから解決されます。
+
+### mise が .miserc.toml を探す場所 {#miserc-locations}
+
+優先順位の高い順に示します。
+
+1. 現在のディレクトリ、次に各親ディレクトリの `.miserc.local.toml`、`.miserc.toml`、`.config/miserc.toml`（この順）。探索はホームディレクトリの後で終了し、ホームディレクトリの外にいる場合はファイルシステムのルートで終了します。また、`MISE_CEILING_PATHS` 環境変数に列挙されたディレクトリの手前で停止し、そのディレクトリは探索されません。ホームディレクトリとルートでは、`.miserc.local.toml` と `.miserc.toml` のみが読み込まれます。
+2. `~/.config/mise/miserc.local.toml`、次に `~/.config/mise/miserc.toml`。どのディレクトリからでも読み込まれます。
+3. `/etc/mise/miserc.toml`。
+
+ファイルは自身が設定したキーだけを上書きし、それ以外のキーは継承された値を保持します。`env` は継承されたリストを置き換え、`env = []` はリストを空にします。`-E` オプションと `MISE_ENV` のような環境変数は、すべての `.miserc.toml` ファイルを上書きします。
+
+### 個人単位とマシン全体での選択 {#personal-and-machine-wide-choices}
+
+プロジェクト全体ではなく自分のチェックアウトに属する選択には、`.miserc.local.toml` を使用します。
+
+```toml [.miserc.local.toml]
+env = ["native"]
+```
+
+これにより、`mise install` や `mise run dev` などのコマンドは `mise.native.toml` を読み込みます。`.miserc.local.toml` をグローバルな Git の ignore ファイル（`core.excludesFile`）に追加して、すべてのリポジトリで追跡対象外のままにし、各ワークツリーで個別に作成してください。
+
+共有のグローバル `miserc.toml` を編集せずにマシン全体で選択するには、`~/.config/mise` の `miserc.local.toml` を使用します。
+
+```toml [~/.config/mise/miserc.local.toml]
+env = ["work"]
+```
+
+プロジェクトの `.miserc.toml` ファイルや `.miserc.local.toml` ファイルは、引き続きこれを上書きできます。
+
+### .miserc.toml でのテンプレート {#templates-in-miserc-toml}
+
+`.miserc.toml` 内の値には、<code v-pre>ceiling_paths = ["{{ env.HOME }}"]</code> のように、限られたコンテキストで [Tera テンプレート（原文）](https://mise.jdx.dev/templates.html) を使用できます。利用できるものについては [.miserc.toml でのテンプレート（原文）](https://mise.jdx.dev/templates.html#miserc-template-support) を参照してください。テンプレートのレンダリングに失敗した場合、mise は警告を表示せずにファイルの生の内容を使用します。
+
+## config_root {#config-root}
+
+`config_root` は、設定ファイルの相対パスを解決する基準となるディレクトリであり、そのファイルのテンプレートにおける <code v-pre>{{ config_root }}</code> の値です。プロジェクト設定の場合、ファイルが `.config/mise.toml`、`.config/mise/config.toml`、`.mise/config.toml`、`mise/config.toml`、または `conf.d/*.toml` のフラグメントであっても、またサブディレクトリから mise を実行した場合でも、これはプロジェクトディレクトリになります。そのファイルで定義されたタスクは、デフォルトでそこで実行されます。例外は `.config/mise/mise.toml` と `.config/mise/mise.local.toml` で、これらのルートは `.config/mise/` 自体です。
+
+| 設定ファイル                                 | `config_root`                |
+| -------------------------------------------- | ---------------------------- |
+| `~/src/app/mise.toml`                        | `~/src/app`                  |
+| `~/src/app/.config/mise.toml`                | `~/src/app`                  |
+| `~/src/app/.config/mise/config.toml`         | `~/src/app`                  |
+| `~/src/app/.config/mise/conf.d/tools.toml`   | `~/src/app`                  |
+| `~/src/app/.mise/config.toml`                | `~/src/app`                  |
+| `~/src/app/mise/conf.d/node/mise.toml`       | `~/src/app/mise/conf.d/node` |
+| `~/.config/mise/config.toml`（グローバル設定） | `~`                          |
+
+[conf.d 内のディレクトリ](#conf-d-folders) は、それ自体がルートです。グローバル設定で別のディレクトリを使うには、[`global_config_root`（原文）](https://mise.jdx.dev/configuration/settings.html#global_config_root) を設定します。
 
 ```toml
-[tools]
-node = '20'
-python = '3.10'
+[env]
+# Both entries resolve against the project root
+_.path = ["tools/bin", "{{ config_root }}/tools/bin"]
+
+# Same as "{{ config_root }}/scripts/env.sh"
+_.source = "scripts/env.sh"
 ```
 
-そして `~/src/myproj/backend/mise.toml` が以下のように定義しているとします。
+## トップレベルキー {#top-level-keys}
+
+| キー                                | 用途                                                                         | ドキュメント                                                                                  |
+| ----------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `[tools]`                           | ツールのバージョンとツールごとのオプション                                   | [開発ツール](/dev-tools/)、[ツールのオプション](/dev-tools/#tool-options)                     |
+| `[tool_config]`                     | この設定ルートが宣言するツールに対するポリシー                               | [`[tool_config]`](#tool-config)                                                               |
+| `[tool_alias]`                      | ツールのカスタムバージョン名                                                 | [ツールのエイリアス](/dev-tools/aliases.html)                                                 |
+| `[plugins]`                         | プラグインのリポジトリ URL とローカルプラグインのパス                        | [`[plugins]`](#plugins)                                                                       |
+| `[env]`                             | コマンドとタスクの環境変数                                                   | [環境変数](/environments/)                                                                    |
+| `[vars]`                            | テンプレート用の値（エクスポートされない）                                   | [設定変数（原文）](https://mise.jdx.dev/configuration/vars.html)                              |
+| `redactions`                        | 出力で隠す `env` または `vars` のキー                                        | [redaction（値の削除）（原文）](https://mise.jdx.dev/environments/secrets/#redaction)         |
+| `[secrets.*]`（実験的）             | mise のシークレットのソース。プロジェクト設定のみ                            | [fnox（原文）](https://mise.jdx.dev/environments/secrets/fnox.html)                           |
+| `[tasks]`                           | タスク                                                                       | [タスク](/tasks/)                                                                             |
+| `[task_config]`                     | タスクのインクルード、除外、デフォルト値                                     | [タスク設定リファレンス（原文）](https://mise.jdx.dev/tasks/task-configuration.html)          |
+| `[task_templates]`                  | `extends` 用の共有タスク定義                                                 | [タスクテンプレート（原文）](https://mise.jdx.dev/tasks/templates.html)                       |
+| `[settings]`                        | mise 自体の動作                                                              | [設定項目（原文）](https://mise.jdx.dev/configuration/settings.html)                          |
+| `[hooks]`                           | `cd` 時、ディレクトリに入ったとき・出たとき、インストール時に実行するコマンド | [フック（原文）](https://mise.jdx.dev/hooks.html)                                             |
+| `[[watch_files]]`                   | ファイルの変更時に実行するコマンド                                           | [フック（原文）](https://mise.jdx.dev/hooks.html)                                             |
+| `[shell_alias]`                     | ディレクトリ内にいる間に定義されるシェルエイリアス。有効化が必要             | [シェルエイリアス（原文）](https://mise.jdx.dev/shell-aliases.html)                           |
+| `[wrappers]`                        | バイナリ名を横取りするコマンド                                               | [コマンドラッパー](/dev-tools/shims.html#command-wrappers)                                    |
+| `include`                           | この設定にマージされる設定ファイル                                           | [`include`](#include)                                                                         |
+| `min_version`                       | このファイルを使用できる最も古い mise のリリース                             | [`min_version`](#minimum-mise-version)                                                        |
+| `monorepo_root`、`[monorepo]`       | `//path:task` 形式でのタスク指定。ルートを信頼すると、その配下の設定も信頼される | [モノレポタスク（原文）](https://mise.jdx.dev/tasks/monorepo.html)                         |
+| `[doctor]`                          | `mise doctor project` 用のプロジェクトのチェック                             | [プロジェクト診断（原文）](https://mise.jdx.dev/configuration/project-diagnostics.html)       |
+| `[deps]`（実験的）                  | プロジェクトの依存関係のプロバイダー                                         | [プロジェクトの依存関係（原文）](https://mise.jdx.dev/dev-tools/deps.html)                    |
+| `[oci]`（実験的）                   | `mise oci build` の設定項目                                                  | [OCI イメージ（原文）](https://mise.jdx.dev/dev-tools/mise-oci.html)                          |
+| `[daemons]`（実験的）               | バックグラウンドプロセスとサービスのプリセット                               | [デーモン（原文）](https://mise.jdx.dev/daemons.html)                                         |
+| `[daemon_groups]`（実験的）         | 名前付きのデーモンのセット                                                   | [グループ（原文）](https://mise.jdx.dev/daemons.html#groups)                                  |
+| `[daemons_settings]`（実験的）      | デーモンの ID とホスト名の名前空間                                           | [ポート、URL、ワークツリー（原文）](https://mise.jdx.dev/daemons/worktrees.html#namespaces)   |
+| `[daemon_providers]`（実験的）      | 共有サーバー。グローバル設定のみ                                             | [プロジェクト間でデーモンを共有する（原文）](https://mise.jdx.dev/daemons/sharing.html)       |
+| `[bootstrap]`                       | マシンのセットアップ（パッケージ、リポジトリ、サービスなど）                 | [ブートストラップ（原文）](https://mise.jdx.dev/bootstrap.html)                               |
+| `[dotfiles]`                        | mise がホームディレクトリで管理するファイル                                  | [dotfiles（原文）](https://mise.jdx.dev/dotfiles.html)                                        |
+| `[dotfile_groups]`                  | dotfiles の名前付きディレクトリツリー                                        | [グループ（原文）](https://mise.jdx.dev/dotfiles/groups.html)                                 |
+| `[history]`                         | dotfiles の履歴が記録する内容                                                | [履歴（原文）](https://mise.jdx.dev/dotfiles/history.html)                                    |
+| `[_]`                               | mise が無視する自由形式のデータ                                              | [`[_]`](#free-form-data)                                                                      |
+
+バージョン指定、`prefix:1.25` のようなプレフィックス、`.tool-versions` については、[バージョン指定とバージョンファイル（原文）](https://mise.jdx.dev/dev-tools/versions.html) で説明しています。グローバルなツールは [`auto_update`](/dev-tools/#automatic-tool-updates) で自身を更新できます。
+
+次のキーは非推奨です。
+
+| 非推奨のキー                 | 代わりに使うもの | 削除予定のバージョン |
+| ---------------------------- | ---------------- | -------------------- |
+| `[alias]`                    | `[tool_alias]`   | 未定                 |
+| `env_file`、`dotenv`         | `env._.file`     | 2027.4.0             |
+| `env_path`                   | `env._.path`     | 2027.4.0             |
+| `experimental_monorepo_root` | `monorepo_root`  | 2027.12.0            |
+
+### `[tool_config]` {#tool-config}
+
+`[tool_config]` は、同じ [設定ルート](#config-root) を共有する設定ファイルが宣言するツールにポリシーを適用します。`mise.local.toml` のポリシーは、その隣にある `mise.toml` のツールにも適用されます。グローバル、システム、または親の設定ルートから継承されたツールには影響しません。
 
 ```toml
+[tool_config]
+locked = true
+
 [tools]
-node = '18'
-ruby = '3.1'
+node = "24"
 ```
 
-この場合、`~/src/myproj/backend` の中では、`node` は `18`、`python` は `3.10`、`ruby`
-は `3.1` になります。有効なバージョンは `mise ls --current` で確認できます。
+ポリシーは `locked` だけです。これは、この設定ルートのツールをロックファイルから解決・インストールすることを必須にします。[厳格なロックファイルモード（原文）](https://mise.jdx.dev/dev-tools/mise-lock.html#strict-lockfile-mode) を参照してください。
 
-`.mise.production.toml` のような環境固有の設定ファイルを持つこともできます。詳細は
-[設定環境](/configuration/environments) を参照してください。
+### `[plugins]` {#plugins}
 
-### `[tools]` - Dev tools {#tools-dev-tools}
-
-[ツール](/dev-tools/) を参照してください。バージョンの指定に加えて、各ツールのエントリには以下のようなオプションを含められます。
-
-- `os`: インストールを特定のオペレーティングシステムに限定します
-- `depends`: この設定内の他のツールに対するインストール順序のみを指定します。vfox プラグインのフックの依存関係はプラグインの `metadata.lua` に記述します（[ツールの依存関係](/dev-tools/#tool-dependencies) を参照）
-- `install_env`: インストール時、およびツールレベルの `postinstall` 実行時に使用される環境変数です
-- `postinstall`: そのツールのインストールが完了した後に実行するコマンドです
-
-例:
-
-```toml
-[tools]
-node = { version = "22", postinstall = "corepack enable" }
-```
-
-### `[env]` - Arbitrary Environment Variables {#env-arbitrary-environment-variables}
-
-[環境変数](/environments/) を参照してください。
-
-### `[tasks.*]` - Run files or shell scripts {#tasks-run-files-or-shell-scripts}
-
-[タスク](/tasks/) を参照してください。
-
-### `[settings]` - Mise Settings {#settings-mise-settings}
-
-設定項目の全リストは [設定（原文）](https://mise.jdx.dev/configuration/settings.html) を参照してください。
-
-### `[plugins]` - Specify Custom Plugin Repository URLs {#plugins-specify-custom-plugin-repository-urls}
-
-`[plugins]` を使うと、プラグインのショートネームを追加・変更できます。これは_新規_のプラグインインストールにのみ
-影響する点に注意してください。既存のプラグインは任意の URL を使用できます。
+`[plugins]` はプラグイン名に対応するリポジトリを設定するため、プロジェクトの全員が同じプラグインをインストールすることになります。
 
 ```toml
 [plugins]
 elixir = "https://github.com/my-org/mise-elixir.git"
-node = "https://github.com/my-org/mise-node.git#DEADBEEF" # supports specific gitref
+node = "https://github.com/my-org/mise-node.git#v1.2.0" # a branch, tag, or full commit SHA
 "vfox-backend:myplugin" = "https://github.com/jdx/vfox-npm"
 ```
 
-プラグインの種類を示すプレフィックス（例: `asdf:`、`vfox:`、`vfox-backend:`）は省略可能です。
-省略した場合、mise はまずプラグインをクローンし、その後インストールされたプラグインのファイルから
-プラグインの種類を検出します。
+コミットに固定する ref は完全な SHA でなければなりません。省略形の SHA はリモートから取得できないため、mise は拒否します。`asdf:`、`vfox:`、`vfox-backend:` のようなプラグインの種類を示すプレフィックスは省略可能です。省略した場合、mise はプラグインをクローンし、プラグインのファイルからその種類を検出します。
 
-特定の URL からプラグインを一度だけインストールしたい場合は、`mise plugin install <NAME> <GIT_URL>`
-を使う方がよいでしょう。プラグインの場所やリビジョンをプロジェクトの他の開発者と共有したい場合は、
-このセクションを `mise.toml` に追加してください。
+エントリは新規インストールにのみ適用されます。インストール済みのプラグインがエントリと一致しなくなった場合（URL が異なる、または ref がチェックアウトされていない場合）、`mise install`、`mise plugins install`、`mise doctor` が警告を出します。`[plugins]` の内容で再インストールするには、`mise plugins install --force <name>` を実行してください。共有せずに URL からプラグインを一度だけインストールするには、代わりに `mise plugins install <name> <git-url>` を実行してください。
 
-ローカルのプラグインディレクトリもサポートされています。絶対パスと `~/` で始まるパスはそのまま使用されます。
-`./` や `../` で始まる明示的な相対パスは、それを宣言したファイルの設定ルートからの相対パスとして解決されます。
+エントリはローカルディレクトリを指すこともできます。絶対パスと `~/` で始まるパスはそのまま使用されます。`./` や `../` で始まる相対パスは、それを宣言したファイルの [設定ルート](#config-root) から解決されます。
 
 ```toml
 [plugins]
 example = "./plugins/mise-example"
 ```
 
-ローカルプラグインは `mise plugins link` と同様に mise のプラグインディレクトリへシンボリックリンクされるため、
-ソースディレクトリへの変更は即座に反映されます。リモートのエントリと同様、`[plugins]` は新規インストールにのみ
-影響します。既存のプラグインを設定済みのローカルソースに置き換えるには
-`mise plugins install --force <NAME>` を実行してください。`file://` ソースは Git リポジトリのままで、
-クローンされます。
+mise は [`mise plugins link`（原文）](https://mise.jdx.dev/cli/plugins/link.html) と同様に、ローカルプラグインをプラグインディレクトリにシンボリックリンクするため、ソースへの変更は即座に反映されます。`file://` URL は Git リポジトリとして扱われ、クローンされます。
 
-これは非推奨の `settings.shorthands_file` / `MISE_SHORTHANDS_FILE` の仕組みを置き換えるものです。別の TOML
-ファイルの代わりに、同じ `shortname = "backend-or-url"` の形式のエントリを `[plugins]` の下に記述してください。
+`[plugins]` は、非推奨の `shorthands_file` 設定項目（`MISE_SHORTHANDS_FILE`）を置き換えるものです。その `shortname = "backend-or-url"` の行をここに移してください。
 
-### `[tool_alias]` - Tool version aliases {#tool-alias-tool-version-aliases}
+### `include` {#include}
 
-::: tip
-`[alias]` は `[shell_alias]` と区別するため `[tool_alias]` に名称が変更されました。
-古い `[alias]` キーも引き続き動作しますが、非推奨です。
-:::
-
-以下の設定は、`mise install node@my_custom_node` を実行すると node-20.x がインストールされるようにします。
-これは [プラグイン](/dev-tools/aliases.md) で指定することもできます。
-エイリアスを追加すると、シンボリックリンクも追加される点に注意してください。この場合は次のようになります。
-
-```sh
-~/.local/share/mise/installs/node/20 -> ./20.x.x
-```
+`include` は他の設定ファイルをこのファイルにマージします。これにより、組織はすべてのリポジトリが使うベースラインを公開でき、リポジトリは大きな設定を複数の部分に分割できます。
 
 ```toml
-[tool_alias.node.versions]
-my_custom_node = '20'
-```
-
-### `[shell_alias]` - Shell aliases {#shell-alias-shell-aliases}
-
-ディレクトリに入ったときに設定され、出るときに解除されるシェルエイリアスを定義します。
-
-```toml
-[shell_alias]
-ll = "ls -la"
-gs = "git status"
-dev = "npm run dev"
-```
-
-これらは環境変数と同様に動作します。つまり、現在のディレクトリに基づいて動的に設定されます。
-詳細は [シェルエイリアス（原文）](https://mise.jdx.dev/shell-aliases.html) を参照してください。
-
-### Minimum mise version {#minimum-mise-version}
-
-設定ファイルが必要とする、サポート対象の mise の最小バージョンを指定します。
-
-ハード最小値（満たさない場合はエラーになる）またはソフト最小値（警告して続行する）を設定できます。
-
-```toml
-# (equivalent to hard)
-min_version = '2024.11.1'
-
-# new object form
-min_version = { hard = '2024.11.1' }
-
-# soft recommendation
-min_version = { soft = '2024.11.1' }
-
-# both
-min_version = { hard = '2024.11.1', soft = '2024.9.0' }
-```
-
-ソフト最小値を満たさない場合、mise は警告を表示し（利用可能であれば）自己更新の手順を表示します。ハード最小値を満たさない場合、mise はエラーになり、自己更新の手順を表示します。
-
-`min_version` を使って、プロジェクトがサポートする最も古い mise のバージョンを伝えましょう。一般に、mise は
-時間とともに変化する外部のレジストリやバックエンドと連携するため、ユーザーは mise を最新の状態に保つべきです。
-プロジェクトや組織は、ユーザーを特定の mise の実行ファイルに固定するよりも、最小バージョン要件を優先するべきです。
-ユーザーを1つの mise のバージョンに固定することは、一般的には推奨されません。ユーザーを古いバージョンに留めることは、
-`apt update` や `brew update` がパッケージメタデータを更新するのを妨げるのと同じです。非推奨の警告が隠れてしまい、
-アップストリームとの連携が古くなったまま放置される可能性があります。
-
-### Monorepo root {#monorepo-root}
-
-設定ファイルをモノレポのルートとしてマークすると、タスクのターゲットパス記法が有効になります。
-
-```toml
-monorepo_root = true
-```
-
-有効にすると:
-
-- サブディレクトリ内のタスクは、名前空間付きのパス（例: `//projects/frontend:build`）で利用できます
-- サブディレクトリのタスクは、親の設定にあるツールを使用します
-- タスクは必要なときにのみ読み込まれます（例: タスクを実行するとき、または `mise tasks ls --all` を使うとき）
-- ルートが信頼されている場合、すべての子孫の設定ファイルは**暗黙的に信頼されます**
-- 各サブディレクトリの設定を個別に信頼する必要がなくなります
-
-詳細な使い方と例については [モノレポタスク（原文）](https://mise.jdx.dev/tasks/monorepo.html) を参照してください。
-
-### `mise.toml` schema {#mise-toml-schema}
-
-- `mise.toml` の JSON スキーマは [schema/mise.json](https://github.com/jdx/mise/blob/main/schema/mise.json) または <https://mise.jdx.dev/schema/mise.json> にあります。
-- 一部のエディタはこれを自動的に読み込み、`mise.toml` ファイルを編集する際に自動補完とバリデーションを提供します（[VSCode](https://code.visualstudio.com/docs/languages/json#_json-schemas-and-settings)、[IntelliJ](https://www.jetbrains.com/help/idea/json.html#ws_json_using_schemas)、[neovim](https://github.com/b0o/SchemaStore.nvim) など）。[JSON schema store](https://www.schemastore.org/) でも利用できます。
-- `included tasks`（[タスクの設定（原文）](https://mise.jdx.dev/tasks/task-configuration.html) を参照）については、別のスキーマ <https://mise.jdx.dev/schema/mise-task.json> がある点に注意してください。
-
-## グローバル設定: `~/.config/mise/config.toml` {#global-config-config-mise-config-toml}
-
-mise は `~/.config/mise/config.toml` で設定できます。これはローカルの `mise.toml` と同様に動作しますが、すべてのディレクトリに適用されます。
-
-ここではよく使われる設定項目のみを示しています。全リストと説明については [設定（原文）](https://mise.jdx.dev/configuration/settings.html) を参照してください。
-
-```toml [~/.config/mise/config.toml]
-[tools]
-# global tool versions go here
-# you can set these with `mise use -g`
-node = 'lts'
-python = ['3.10', '3.11']
-
-[settings]
-# read version files used by other version managers, such as .nvmrc
-idiomatic_version_file_enable_tools = ['node']
-
-trusted_config_paths = [
-    '~/work/my-trusted-projects',
+include = [
+  "./config/tools.toml",
+  "git::https://github.com/myorg/platform.git//mise.toml?ref=main",
+  "oci::ghcr.io/myorg/platform-config@sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
 ]
 
-env_file = '.env' # load env vars from a dotenv file, see `MISE_ENV_FILE`
+[tools]
+node = "24" # this file's own entries override the included ones
+```
 
-[settings.status]
-show_env = false
-show_tools = false
+ローカルの include は `.toml` ファイルへのパスで、インクルードする側のファイルからの相対パスか絶対パスです。`git::` の include は `.toml` ファイルを指します。`oci::` の include は、ルートに `mise.toml` を持つアーティファクトを指します。
 
-# "_" is a special key for information you'd like to put into mise.toml that mise will never parse
+インクルードされたファイルの優先順位は、それをインクルードするファイルのすぐ下になり、`include` 内で後にあるエントリが前のエントリを上書きします。インクルードされたファイルの `_.file` のような相対パスや <code v-pre>{{ config_root }}</code> は、インクルードする側のファイルを基準に解決されます。そのツールはインクルードする側のファイルのロックファイルでロックされ、その `min_version` も適用されます。
+
+インクルードされるファイルには、`[tools]`、`[tool_alias]`、`[env]`、`[vars]`、`[hooks]`、`[shell_alias]`、`[plugins]`、`[wrappers]`、`[bootstrap]`、`min_version`、`[_]` を含められます。非推奨の `[alias]` キーと `env_path` キーも受け付けます。そのフックは、同じイベントについて、インクルードする側のファイルのフックより前に実行されます。`[bootstrap]` のエントリはキーごとにマージされ、インクルードする側のファイル自身のエントリが優先されます。それ以外のキーはエラーになります。該当するのは、`include`（include はネストできません）、`[settings]` とモノレポ関連のキー（mise は include を解決する前にこれらを読み込みます）、`[tasks]`、`task_config`、`task_templates`（タスクは [`task_config.includes`（原文）](https://mise.jdx.dev/tasks/task-discovery.html) で共有してください）、および `[dotfiles]` や `[daemons]` のようなマシン用のセクションです。
+
+include は、インクルードする側のファイルの信頼を使用します。未信頼のプロジェクトが、`cd` したときに mise に URL を取得させることはできません。また、[セーフモード（原文）](https://mise.jdx.dev/security.html#safe-mode) では、プロジェクト設定の include を取得することはありません。ファイルを信頼すると、`git pull` で変更される `mise.toml` と同様に、インクルードされた内容はその信頼のもとで実行されます。[パラノイドモード（原文）](https://mise.jdx.dev/paranoid.html#remote-includes) では、include はコミット SHA または OCI ダイジェストに固定されている必要があり、ローカルの include は、その内容がファイルの信頼ハッシュの対象にならないためエラーになります。
+
+ローカルの include は読み込みのたびに読み取られ、キャッシュされることはありません。mise はリモートからインクルードしたファイルをそれぞれ `MISE_CACHE_DIR` 配下にキャッシュし、コミット SHA や OCI ダイジェストを再取得することはありません。`mise install`、`mise use`、`mise upgrade` などのコマンドは、キャッシュされたコピーが [`fetch_remote_versions_cache`（原文）](https://mise.jdx.dev/configuration/settings.html#fetch_remote_versions_cache) より古くなると、ブランチ、タグ、OCI タグを更新します。シェルの有効化、`mise exec`、`mise env`、`mise ls`、shim、および [オフライン（原文）](https://mise.jdx.dev/configuration/settings.html#offline) モードでは、常にキャッシュされたコピーが使用されます。更新に失敗した場合や、この mise では読み込めないファイルが返された場合、mise は警告を出してキャッシュされたコピーを使い続けます。キャッシュがない場合はエラーになります。`mise cache clear` で強制的に再取得できます。
+
+### `min_version` {#minimum-mise-version}
+
+文字列だけを指定すると、ハード最小値になります。古い mise のリリースはエラーで停止し、アップグレードの手順を表示します。
+
+```toml
+min_version = "2026.1.0"
+```
+
+失敗させずに警告を出すには、ソフト最小値を追加します。
+
+```toml
+min_version = { hard = "2025.6.0", soft = "2026.1.0" }
+```
+
+`hard` にはこのファイルを理解できる最も古いリリースを、`soft` にはチームメイトに使ってほしいリリースを設定します。`{ soft = "2026.1.0" }` を単独で指定することもできます。
+
+### `[_]` {#free-form-data}
+
+mise は `[_]` テーブルを一切読み込まないため、mise にキーを拒否されることなく、設定ファイルに独自のデータを保持できます。
+
+```toml
 [_]
-foo = "bar"
+owner = "platform-team"
 ```
 
-## システム設定: `/etc/mise/config.toml` {#system-config-etc-mise-config-toml}
+### エディター用のスキーマ {#mise-toml-schema}
 
-`~/.config/mise/config.toml` と似ていますが、システム上のすべてのユーザーに適用されます。すべてのユーザーに対して
-デフォルト値を設定するのに便利です。
-
-## `.tool-versions` {#tool-versions}
-
-`.tool-versions` ファイルは asdf の設定ファイルで、`mise.toml` と同様に mise で使用できます。柔軟性は `mise.toml`
-に劣るため、代わりに `mise.toml` を使うことを推奨します。すでに多くの `.tool-versions` ファイルがある場合や、asdf
-を使っているチームで作業している場合には便利です。
-
-サポートされているすべての構文の例を以下に示します。
-
-```text
-node        20.0.0       # comments are allowed
-ruby        3            # can be fuzzy version
-shellcheck  latest       # also supports "latest"
-jq          1.6
-erlang      ref:master   # compile from vcs ref
-go          prefix:1.19  # uses the latest 1.19.x version—needed in case "1.19" is an exact match
-shfmt       path:./shfmt # use a custom runtime
-node        lts          # use lts version of node (not supported by all plugins)
-
-node        sub-2:lts      # subtract 2 from the resolved major version (e.g.: 20 becomes 18)
-python      sub-0.1:latest # subtract 1 from the resolved minor version (e.g.: 3.11 becomes 3.10)
-```
-
-このファイル形式の詳細については [asdf のドキュメント](https://asdf-vm.com/manage/configuration.html#tool-versions) を参照してください。
-
-## スコープ {#scopes}
-
-`mise.toml` と `.tool-versions` はいずれも、バージョンの振る舞いを変更する「スコープ」をサポートしています。
-
-- `ref:<SHA>` - vcs（通常は git）の ref からコンパイルします
-- `prefix:<PREFIX>` - プレフィックスに一致する最新バージョンを使用します。Go では `1.20` は `1.20`
-  に厳密一致するものしかマッチしませんが、`prefix:1.20` なら `1.20.1` や `1.20.2` などにもマッチするため便利です。
-- `path:<PATH>` - 指定したパスにあるカスタムのコンパイル済みバージョンを使用します。用途の一例として、Homebrew
-  のツールを再利用する場合があります（例: `path:/opt/homebrew/opt/node@20`）。
-- `sub-<PARTIAL_VERSION>:<ORIG_VERSION>` - `ORIG_VERSION` を解決し、`PARTIAL_VERSION` の数値部分を対応する
-  解決済みバージョンの各部分から減算し、その結果をバージョンのプレフィックスとして解決します。例えば、
-  `sub-2:lts` は `lts` を解決し、そのメジャー部分から2を減算します（`20` は `18` になります）。一方、
-  `sub-0.1:latest` は解決済みのマイナー部分から1を減算します（`3.11` は `3.10` になります）。これは数値の
-  バージョン演算であり、N個前のリリースを求めるものではありません。
+`mise.toml` の JSON スキーマは <https://mise.jdx.dev/schema/mise.json> と [JSON Schema Store](https://www.schemastore.org/) にあるため、[VS Code](https://code.visualstudio.com/docs/languages/json#_json-schemas-and-settings)、[IntelliJ](https://www.jetbrains.com/help/idea/json.html#ws_json_using_schemas)、[Neovim](https://github.com/b0o/SchemaStore.nvim) などのエディターで補完とバリデーションを行えます。`task_config.includes` で読み込むタスクファイルには、別のスキーマ <https://mise.jdx.dev/schema/mise-task.json> を使用します。
 
 ## idiomatic バージョンファイル {#idiomatic-version-files}
 
-mise は asdf と同様に「idiomatic バージョンファイル（idiomatic version file）」をサポートしています。これは
-`.node-version` や `.python-version` のような言語固有のファイルです。他の開発者に mise や asdf といった特定の
-ツールの使用を強制することなく、プロジェクトのランタイムバージョンを設定するのに最適です。
-
-これらはエイリアスをサポートしています。つまり、`lts/hydrogen` と書かれた `.nvmrc` ファイルを用意すれば、mise
-と nvm の両方で機能します。サポートされている idiomatic バージョンファイルの一部を以下に示します。
-
-<!-- mise:idiomatic-version-files:start -->
-
-| プラグイン    | idiomatic ファイル                                                                                                                                                                                                                                                                                          |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| atmos         | `.atmos-version`                                                                                                                                                                                                                                                                                           |
-| bun           | `.bun-version`, `package.json`                                                                                                                                                                                                                                                                             |
-| chezmoi       | `.chezmoiversion`                                                                                                                                                                                                                                                                                          |
-| cmake         | `CMakeLists.txt`                                                                                                                                                                                                                                                                                           |
-| crystal       | `.crystal-version`                                                                                                                                                                                                                                                                                         |
-| dagger        | `dagger.json`                                                                                                                                                                                                                                                                                              |
-| deno          | `.deno-version`, `package.json`                                                                                                                                                                                                                                                                            |
-| dotnet        | `global.json`                                                                                                                                                                                                                                                                                              |
-| earthly       | `Earthfile`                                                                                                                                                                                                                                                                                                |
-| elixir        | `.exenv-version`                                                                                                                                                                                                                                                                                           |
-| go            | `.go-version`, `go.mod`                                                                                                                                                                                                                                                                                    |
-| golangci-lint | `.golangci.yml`, `.golangci.yaml`, `.golangci.toml`, `.golangci.json`                                                                                                                                                                                                                                      |
-| goreleaser    | `.config/goreleaser.yml`, `.config/goreleaser.yaml`, `.goreleaser.yml`, `.goreleaser.yaml`, `goreleaser.yml`, `goreleaser.yaml`                                                                                                                                                                            |
-| java          | `.java-version`, `.sdkmanrc`                                                                                                                                                                                                                                                                               |
-| lefthook      | `lefthook.yml`, `lefthook.yaml`, `.lefthook.yml`, `.lefthook.yaml`, `lefthook.toml`, `.lefthook.toml`, `lefthook.json`, `.lefthook.json`, `lefthook.jsonc`, `.lefthook.jsonc`, `.config/lefthook.yml`, `.config/lefthook.yaml`, `.config/lefthook.toml`, `.config/lefthook.json`, `.config/lefthook.jsonc` |
-| node          | `.nvmrc`, `.node-version`, `package.json`                                                                                                                                                                                                                                                                  |
-| npm           | `package.json`                                                                                                                                                                                                                                                                                             |
-| opentofu      | `.opentofu-version`                                                                                                                                                                                                                                                                                        |
-| packer        | `.packer-version`                                                                                                                                                                                                                                                                                          |
-| perl          | `.perl-version`                                                                                                                                                                                                                                                                                            |
-| pixi          | `pixi.toml`, `pyproject.toml`                                                                                                                                                                                                                                                                              |
-| pnpm          | `package.json`                                                                                                                                                                                                                                                                                             |
-| pre-commit    | `.pre-commit-config.yaml`                                                                                                                                                                                                                                                                                  |
-| python        | `.python-version`, `.python-versions`                                                                                                                                                                                                                                                                      |
-| ruby          | `.ruby-version`, `Gemfile`                                                                                                                                                                                                                                                                                 |
-| ruff          | `ruff.toml`, `.ruff.toml`                                                                                                                                                                                                                                                                                  |
-| rust          | `rust-toolchain.toml`                                                                                                                                                                                                                                                                                      |
-| swift         | `.swift-version`                                                                                                                                                                                                                                                                                           |
-| task          | `Taskfile.yml`, `Taskfile.yaml`, `taskfile.yml`, `taskfile.yaml`                                                                                                                                                                                                                                           |
-| terraform     | `.terraform-version`                                                                                                                                                                                                                                                                                       |
-| terragrunt    | `.terragrunt-version`                                                                                                                                                                                                                                                                                      |
-| terramate     | `.terramate-version`                                                                                                                                                                                                                                                                                       |
-| yarn          | `.yvmrc`, `package.json`                                                                                                                                                                                                                                                                                   |
-| zig           | `.zig-version`                                                                                                                                                                                                                                                                                             |
-
-<!-- mise:idiomatic-version-files:end -->
-
-レジストリに登録されたツールは、構造化された idiomatic ファイルからバージョンを抽出する方法を記述することもできます。
-レジストリのエントリは、[HTTP バックエンド（原文）](https://mise.jdx.dev/dev-tools/backends/http.html#version-listing)
-と同じ `version_regex`、`version_json_path`、`version_expr` パーサーを使用できます。これにより、`aqua:` や `github:`
-といったバックエンド経由でインストールされたツールは、asdf や vfox のプラグインを必要とせずに JSON マニフェストや
-他のツール固有のバージョンファイルをサポートできます。
-
-一部のファイルは、正確なバイナリリリースではなく、互換性のある最小バージョンや設定フォーマットのメジャーバージョンを
-宣言します。mise はその値を通常のバージョンリクエストとして扱うため、`3.25` のような値は CMake 3.25 の最新の
-一致するリリースを選び、GoReleaser の設定 `version: 2` は GoReleaser 2.x の最新リリースを選びます。
-
-`go.mod` の場合、`toolchain goX.Y.Z` ディレクティブ（正確なツールチェインの固定）が存在すればそれが使用されます。
-存在しない場合は `go X.Y` ディレクティブが使用されます。これは必要な Go バージョンの_最小値_のみを宣言するため、
-mise は一致する最新のパッチバージョンに解決します（例: `go 1.22` → 最新の `1.22.x`）。
-
-mise では、これらはデフォルトで無効になっています。その理由については <https://github.com/jdx/mise/discussions/4345> を参照してください。
-
-- Python のような特定のツールに対しては `mise settings add idiomatic_version_file_enable_tools python` を使用します（[ドキュメント（原文）](https://mise.jdx.dev/configuration/settings.html#idiomatic_version_file_enable_tools)）
-
-個々のファイルは `tool:filename` のペアで、特定のツールに対して無効化できます。例えば、node に対して `.nvmrc`
-を使いつつ、`package.json` はパッケージマネージャー向けに残しておく場合は次のようにします。
-
-```sh
-mise settings add idiomatic_version_file_disable_files node:package.json
-```
-
-これらのファイルを検出・解析するには、わずかなパフォーマンスコストがかかります。レジストリのパーサーはプロセス内で
-実行されますが、プラグインが提供するファイルはプラグインのパーサーを呼び出すことがあります。結果は
-[キャッシュされる（原文）](https://mise.jdx.dev/cache-behavior.html)ため、通常は気になりません。
-
-::: info
-asdf ではこれらを「レガシーバージョンファイル」と呼んでいます。これは使うべきではないことを暗示してしまうため、
-良くない名前だと私は思います。実際にはそんなことは全くありません。私は「idiomatic」バージョンファイルという用語を
-好んでいます。これらは asdf や mise 専用のバージョンファイルではなく、他のツールでも使用できるからです
-（`.nvmrc` は特定のツールに紐づいているという注目すべき例外です）。
-:::
-
-## 設定 {#settings}
-
-設定項目の全リストは [設定（原文）](https://mise.jdx.dev/configuration/settings.html) を参照してください。
-
-## タスク {#tasks}
-
-設定オプションの全リストは [タスク](/tasks/) を参照してください。
-
-## 環境変数 {#environment-variables}
-
-::: tip
-通常、mise における環境変数は [設定項目（原文）](https://mise.jdx.dev/configuration/settings.html) を設定するために
-使われるため、ほとんどの環境変数はそのドキュメントに記載されています。以下は、設定項目ではない環境変数です。
-
-mise における設定項目とは、一般に、環境変数としても設定ファイルとしても設定できるものを指します。
-:::
-
-mise は環境変数を通じて設定することもできます。以下のオプションが利用可能です。
-
-### `MISE_DATA_DIR` {#mise-data-dir}
-
-デフォルト（Linux）: `~/.local/share/mise` または `$XDG_DATA_HOME/mise`
-デフォルト（macOS）: `~/.local/share/mise` または `$XDG_DATA_HOME/mise`
-デフォルト（Windows）: `%LOCALAPPDATA%\mise` または `$XDG_DATA_HOME/mise`
-
-これは mise がプラグインとツールのインストール先を保存するディレクトリです。これらはマシン間で共有される
-べきではありません。
-
-### `MISE_CACHE_DIR` {#mise-cache-dir}
-
-デフォルト（Linux）: `~/.cache/mise` または `$XDG_CACHE_HOME/mise`
-デフォルト（macOS）: `~/Library/Caches/mise` または `$XDG_CACHE_HOME/mise`
-デフォルト（Windows）: `%TEMP%\mise` または `$XDG_CACHE_HOME/mise`
-
-これは mise が内部キャッシュを保存するディレクトリです。マシン間で共有されるべきではありません。mise が
-実行されていない間は、いつでも削除される可能性があります。
-
-### `MISE_TMP_DIR` {#mise-tmp-dir}
-
-デフォルト: rust における [`std::env::temp_dir()`](https://doc.rust-lang.org/std/env/fn.temp_dir.html)
-の実装
-
-これは、ツールのインストール時などの一時的な保存に使用されます。
-
-### `MISE_SYSTEM_CONFIG_DIR` {#mise-system-config-dir}
-
-デフォルト: `/etc/mise`
-
-これは mise がシステム全体の設定を保存するディレクトリです。`MISE_SYSTEM_DIR` も旧来のエイリアスとして
-サポートされています。
-
-### `MISE_GLOBAL_CONFIG_FILE` {#mise-global-config-file}
-
-デフォルト: `$MISE_CONFIG_DIR/config.toml`（通常は `~/.config/mise/config.toml`）
-
-これは設定ファイルへのパスです。
-
-`$HOME` から実行する `mise use` や `mise set` のようなグローバルな書き込みを、別の設定ファイルに向けたい場合に
-使用します。[`MISE_DEFAULT_CONFIG_FILENAME`](#mise-default-config-filename) はデフォルトのローカル設定ファイル名を
-カスタマイズするものであり、グローバル設定のパスではありません。
-
-### `MISE_DEFAULT_CONFIG_FILENAME` {#mise-default-config-filename}
-
-デフォルト: `mise.toml`
-
-これは、mise がプロジェクトの設定ファイルを作成または検索する際に使用する、デフォルトのローカル設定ファイル名を
-カスタマイズします。
-
-### `MISE_GLOBAL_CONFIG_ROOT` {#mise-global-config-root}
-
-デフォルト: `$HOME`
-
-::: v-pre
-これは、グローバル設定ファイルにおいて `{{config_root}}` として使用されるパスです。
-:::
-
-### `MISE_ENV_FILE` {#mise-env-file}
-
-dotenv ファイルから環境変数を読み込むために、ファイル名を設定します。例: `MISE_ENV_FILE=.env`。これは現在の
-ディレクトリと親ディレクトリの中で、一致するすべてのファイルを検索して読み込みます。内部では
-[dotenvy](https://crates.io/crates/dotenvy) を使用しています。
-
-### `MISE_${TOOL}_VERSION` {#mise-tool-version}
-
-ツールのバージョンを設定します。例えば、`MISE_NODE_VERSION=20` は、`mise.toml` や `.tool-versions` に
-何が設定されていても関係なく <node@20.x> を使用します。
-
-### `MISE_TRUSTED_CONFIG_PATHS` {#mise-trusted-config-paths}
-
-これは、mise が自動的に信頼済みとしてマークするパスのリストです。これらは `PATH` 環境変数のプラットフォームの
-慣例に従って区切られます。Unix では `:`、Windows では `;` です。
-
-### `MISE_CEILING_PATHS` {#mise-ceiling-paths}
-
-これは、mise が設定ファイルやファイルタスクの検索を停止するパスのリストです。これは、読み込みが遅い
-ディレクトリでの mise の検索を停止させるのに便利です。これらは `PATH` 環境変数のプラットフォームの慣例に
-従って区切られます。ほとんどの Unix プラットフォームでは区切り文字は `:` で、Windows では `;` です。
-
-### `MISE_LOG_LEVEL=trace|debug|info|warn|error` {#mise-log-level-trace-debug-info-warn-error}
-
-これらは mise の詳細度を変更します。
-
-`MISE_DEBUG=1`、`MISE_TRACE=1`、`MISE_QUIET=1`、および `--log-level=trace|debug|info|warn|error` も
-使用できます。
-
-### `MISE_LOG_FILE=~/mise.log` {#mise-log-file-mise-log}
-
-ログをファイルに出力します。
-
-### `MISE_LOG_FILE_LEVEL=trace|debug|info|warn|error` {#mise-log-file-level-trace-debug-info-warn-error}
-
-`MISE_LOG_LEVEL` と同様ですが、ログ_ファイル_の出力レベルに対するものです。ログを保存しつつ、画面表示を
-煩雑にしたくない場合に便利です。
-
-### `MISE_LOG_HTTP=1` {#mise-log-http-1}
-
-ログに HTTP のリクエスト/レスポンスを表示します。
-
-### `MISE_LOG_VERBOSE_DEPS=1` {#mise-log-verbose-deps-1}
-
-ノイズの多いサードパーティ製 crate（`h2`、`hyper`、`reqwest`、`rustls` など。HTTP/2 のフレームやソケット
-読み取りごとに1行のログを出力します）からのデバッグログとトレースログは、常に除外されます。除外しないと
-debug/trace の出力を圧倒してしまうためです。これらのログを通過させるには、これを `1` に設定します。
-`--log-level=trace`/`-vv` を使用している場合でも、これらのログを見る唯一の方法です。
-
-### `MISE_QUIET=1` {#mise-quiet-1}
-
-`MISE_LOG_LEVEL=warn` と同等です。
-
-### `MISE_HTTP_TIMEOUT` {#mise-http-timeout}
-
-HTTP リクエストのタイムアウトを秒単位で設定します。デフォルトは `30` です。
-
-### `MISE_RAW=1` {#mise-raw-1}
-
-プラグインのスクリプトを stdin/stdout/stderr に直接パイプするには、"1" に設定します。デフォルトでは stdin は
-無効になっています。これは、複数のプラグインを並行してインストールする際にプロンプトが表示されなくなるためです。
-プラグインが入力を受け付ける場合や、正しくインストールされていないように見える場合に使用してください。
-
-一度に1つのプラグインスクリプトしか実行できないため、`MISE_JOBS=1` が設定されます。
-
-### `MISE_TERM_WIDTH` {#mise-term-width}
-
-mise がテーブルやリストを表示する際に使用する（例: `mise ls`）ターミナル幅を上書きします。デフォルトでは
-mise はターミナルから幅を検出します。これは、CI や他の非対話的な環境で検出結果が不正な値になり（例えば
-CircleCI では幅が `0` と報告されます）、出力が奇妙に折り返されてしまう場合に便利です。
-
-`MISE_TERM_WIDTH` が設定されていない場合、mise は慣例的な `COLUMNS` 環境変数にフォールバックし、最終的には
-自動検出にフォールバックします。上書きした値は厳密に反映されるため、より狭い幅を強制することもできます。
-
-```sh
-MISE_TERM_WIDTH=120 mise ls
-```
-
-### `MISE_FISH_AUTO_ACTIVATE=1` {#mise-fish-auto-activate-1}
-
-fish シェル用の vendor_conf.d スクリプトが自動的に有効化されるように設定します。このファイルは homebrew や、
-その他の可能性のあるインストール方法において、設定なしで mise を自動的に有効化するために自動的に使用されます。
-
-デフォルトでは有効になっています。無効にするには "0" に設定してください。
+mise は、ツールに対して有効化すれば、`.nvmrc` や `.python-version` のような他のツールが使うバージョンファイルを読み込めます。サポートされているファイルと有効化の方法については、[idiomatic バージョンファイル（原文）](https://mise.jdx.dev/dev-tools/versions.html#idiomatic-version-files) を参照してください。

@@ -48,7 +48,11 @@ const BANNED: Array<{ term: string; pattern: RegExp; reason: string }> = [
     pattern: /ことができます/,
     reason: "「〜できます」にする（glossary 定型フレーズ）",
   },
-  { term: "フラグ", pattern: /フラグ/, reason: "flag / option は「オプション」に統一（glossary）" },
+  {
+    term: "フラグ",
+    pattern: /フラグ(?!メント)/,
+    reason: "flag / option は「オプション」に統一（glossary）",
+  },
   { term: "試験的", pattern: /試験的/, reason: "experimental は「実験的」に統一（glossary）" },
   { term: "フォルダ", pattern: /フォルダ/, reason: "directory は「ディレクトリ」（glossary）" },
   { term: "トラスト", pattern: /トラスト/, reason: "trust は「信頼」（CLAUDE.md よくある誤訳）" },
@@ -344,7 +348,9 @@ function checkUntranslated(origSrc: string, tranSrc: string): Issue[] {
     // - タブ見出しは固有名詞だけのことが多い（`== Debian/Ubuntu (apt)`）
     // - `:::` コンテナの開始行はラベルを訳さない決まり
     // - HTML コメントは markdownlint 指示や訳注
+    // - `<a id="..."></a>` だけの行は旧アンカーを残すための原文由来のタグ
     if (/^={2,}/.test(t) || t.startsWith(":::") || t.startsWith("<!--")) continue;
+    if (/^<a id="[^"]*"><\/a>$/.test(t)) continue;
     const p = prose(line);
     if (p.length > 25 && !hasJa.test(p) && FUNCTION_WORDS.test(p) && origProse.has(p)) {
       issues.push({

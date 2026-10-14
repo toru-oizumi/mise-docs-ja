@@ -1,191 +1,146 @@
-# Comparison to asdf
+---
+description: "Move projects and personal defaults from asdf to mise, with command equivalents and the differences to expect."
+---
 
-mise can be used as a drop-in replacement for asdf. It supports the same `.tool-versions` files that
-you may have used with asdf and can use asdf plugins through
-the [asdf backend](/dev-tools/backends/asdf.html).
+# Migrating from asdf
 
-It will not, however, reuse existing asdf directories
-(so you'll need to either reinstall them or move them), and 100% compatibility is not a design goal.
-That said,
-if you're coming from asdf-bash (0.15 and below), mise actually
-has [fewer breaking changes than asdf-go (0.16 and above)](https://asdf-vm.com/guide/upgrading-to-v0-16.html)
-despite 100% compatibility not being a design goal of mise.
+mise reads `.tool-versions` files and can run
+[asdf plugins](/dev-tools/backends/asdf.html), so you can move one project at
+a time while teammates keep using asdf. mise has its own commands, install
+directories, and backends, so check each project after you switch.
 
-Casual users coming from asdf have generally found mise to just be a faster, easier to use asdf.
+## Migrate a project {#migrate-from-asdf-to-mise}
 
-:::tip
-Make sure you have a look at [environments](/environments/) and [tasks](/tasks/) which
-are major portions of mise that have no asdf equivalent.
-:::
+Start in one project before you change your shell setup:
 
-## Migrate from asdf to mise
+1. [Install mise](/installing-mise.html).
+2. In the project directory, run `mise config ls` and `mise ls --current` to
+   see how mise reads the existing `.tool-versions`.
+3. Run `mise install`, then check a tool through mise:
 
-If you're moving from asdf to mise, please
-review [#how-do-i-migrate-from-asdf](/faq.html#how-do-i-migrate-from-asdf) for guidance.
+   ```sh
+   mise exec -- node --version
+   ```
 
-## asdf in go (0.16+)
+   Use a command from your project's tools in place of `node --version`. mise
+   installs its own copies of each tool. It does not reuse asdf's install
+   directories, and the two managers must not share one.
 
-asdf has gone through a rewrite in go. Because this is quite new as of this writing (2025-01-01),
-I'm going to keep information about 0.16+ asdf versions (which I call "asdf-go" vs "asdf-bash") in
-this section and the rest of this doc will apply to asdf-bash (0.15 and below).
+4. Once the project works, remove asdf's activation and its shim directory
+   from your shell startup files, and [activate mise](/shell-setup.html). Start
+   a new shell and check `mise doctor` and `command -v node`.
 
-In terms of performance, mise is still faster than the go asdf, however the difference is much
-closer. asdf is likely fast enough that the difference in overhead between asdf-go and mise may not
-even be enough to notice for you—after all there are plenty of people still using asdf-bash that
-claim they don't even notice how slow it is (don't ask me how):
-
-![asdf vs mise exec performance comparison chart](./asdf-mise-exec-perf.jpg)
-
-I don't think performance is a good enough reason to switch though now that asdf-go is a thing. It's
-a reason, but it's a minor one. The improved security in mise, better DX, and lack of reliance on
-shims are all more important than performance.
-
-Given they went through the trouble of rewriting asdf—that's also an indication they want to keep
-working on it (which is awesome that they're doing that btw). This does mean that some of what's
-written here may go out of date if they address some of the problems
-with asdf.
-
-## Supply chain security
-
-asdf plugins are not secure. This is explained
-in [SECURITY.md](https://github.com/jdx/mise/blob/main/SECURITY.md), but the quick explanation is
-that asdf plugins involve shell code which can essentially do anything on your machine. It's
-dangerous code. What's worse is asdf plugins are rarely written by the tool vendor (who you need to
-trust anyway to use the tool), which means for every asdf plugin you use you'll be trusting a random
-developer to not go rogue and to not get hacked themselves and publish changes to a plugin with an
-exploit.
-
-mise still uses asdf plugins for some tools, but we're actively reducing that count as well as
-moving things into the [mise-plugins org](https://github.com/mise-plugins). It looks like asdf has a
-similar model with their asdf-community org, but it isn't. asdf gives plugin authors commit access
-to their plugin in [asdf-community](https://github.com/asdf-community) when they move it in, which I
-feel like defeats the purpose of having a dedicated org in the first place. By the end of 2025 I
-would like for there to no longer be any asdf plugins in the registry that aren't owned by me.
-
-I've also been adopting extra security verification steps when vendors offer that ability such as
-gpg verification on node installs, and native Cosign/SLSA/Minisign/GitHub attestation verification for aqua tools.
-
-## UX
-
-![CleanShot 2024-01-28 at 12 36 20@2x](https://github.com/jdx/mise-docs/assets/216188/47f381d7-1566-4b78-9260-3b85a21dd6ec)
-
-Some commands are the same in asdf but others have been changed. Everything that's possible
-in asdf should be possible in mise but may use slightly different syntax. mise has more forgiving
-commands,
-such as using fuzzy-matching, e.g.: `mise install node@20`. While in asdf you _can_ run
-`asdf install node latest:20`, you can't use `latest:20` in a `.tool-versions` file or many other
-places.
-In `mise` you can use fuzzy-matching everywhere.
-
-asdf requires several steps to install a new runtime if the plugin isn't installed, e.g.:
+To move the project to `mise.toml`, preview the conversion, then write it:
 
 ```sh
-asdf plugin add node
-asdf install node latest:20
-asdf local node latest:20
+mise generate config --tool-versions .tool-versions --dry-run
+mise generate config --tool-versions .tool-versions
 ```
 
-In `mise` this can all be done in a single step which installs the plugin, installs the runtime,
-and sets the version:
+Delete `.tool-versions` afterwards unless asdf users still need it. Once every
+project works, you can
+[uninstall asdf](https://asdf-vm.com/manage/core.html#uninstall).
+
+## Command equivalents {#command-compatibility}
+
+| Task                         | asdf                                                     | mise                                                                             |
+| ---------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Install a version            | `asdf install nodejs 24.0.0`                             | `mise install node@24.0.0`                                                       |
+| Select a project version     | `asdf set nodejs 24.0.0` (before 0.16: `asdf local`)     | `mise use node@24.0.0` (also installs)                                           |
+| Select a personal default    | `asdf set -u nodejs 24.0.0` (before 0.16: `asdf global`) | `mise use -g node@24.0.0`                                                        |
+| Add a plugin                 | `asdf plugin add nodejs`                                 | Not needed for registry tools; otherwise `mise plugins install <name> <git-url>` |
+| List installed versions      | `asdf list nodejs`                                       | `mise ls node`                                                                   |
+| List available versions      | `asdf list all nodejs`                                   | `mise ls-remote node`                                                            |
+| Show the latest version      | `asdf latest nodejs`                                     | `mise latest node`                                                               |
+| Inspect selected versions    | `asdf current`                                           | `mise ls --current`                                                              |
+| Find the selected executable | `asdf which node`                                        | `mise which node`                                                                |
+| Show an install directory    | `asdf where nodejs`                                      | `mise where node`                                                                |
+| Run with selected versions   | `asdf exec node -v`                                      | `mise exec -- node -v`                                                           |
+| Uninstall a version          | `asdf uninstall nodejs 24.0.0`                           | `mise uninstall node@24.0.0`                                                     |
+| Rebuild shims                | `asdf reshim`                                            | `mise reshim`                                                                    |
+
+asdf 0.16 rewrote asdf in Go and replaced `asdf local` and `asdf global` with
+[`asdf set`](https://asdf-vm.com/manage/versions.html). `mise set` is
+unrelated: it sets environment variables. Use `mise use` for tool versions.
+
+mise accepts some asdf spellings, such as `mise install node 24.0.0` and the
+tool names `nodejs` and `golang`, but it does not emulate asdf completely. Use
+mise's own syntax in scripts, and the names `node` and `go` in `mise.toml`.
+
+## Share `.tool-versions` with asdf users {#share-tool-versions}
+
+Keep a shared `.tool-versions` while teammates still use asdf. To update it
+with mise, name the file and pin a concrete version that asdf accepts:
 
 ```sh
-mise use node@20
+mise use --path .tool-versions --pin node@24
 ```
 
-If you have an existing `.tool-versions` file, or `.mise.toml`, you can install all plugins
-and runtimes with a single command:
+Keep [mise-only requests](/dev-tools/versions.html#request-syntax) such as
+`prefix:`, `sub-`, and backend names like `aqua:jqlang/jq` out of a file that
+asdf reads. A `mise.toml` in the same directory takes precedence for the tools
+it declares, so check for conflicting declarations before you keep both files.
+Tools listed only in `.tool-versions` are not written to
+[`mise.lock`](/dev-tools/mise-lock.html), and `--locked` does not check them.
+
+## Personal defaults {#personal-defaults}
+
+mise keeps personal defaults in `~/.config/mise/config.toml`. Choose the
+versions you want and set them with `mise use -g`:
 
 ```sh
-mise install
+mise use -g node@24 python@3.14
 ```
 
-I've found asdf to be particularly rigid and difficult to learn. It also made strange decisions like
-having `asdf list all` but `asdf latest --all` (why is one a flag and one a positional argument?).
-`mise` makes heavy use of aliases so you don't need to remember if it's `mise plugin add node` or
-`mise plugin install node`. If I can guess what you meant, then I'll try to get mise to respond
-in the right way.
+mise also reads `~/.tool-versions`, because it looks for `.tool-versions` in
+every parent directory. asdf's global versions therefore keep applying to
+projects under your home directory until you move them into
+`~/.config/mise/config.toml` and delete or trim that file. Run `mise config ls`
+from your home directory to see both files.
 
-That said, there are a lot of great things about asdf. It's the best multi-runtime manager out there
-and I've really been impressed with the plugin system. Most of the design decisions the authors made
-were very good. I really just have 2 complaints: the shims and the fact it's written in Bash.
+Copy versions one by one rather than converting the file wholesale. Check
+entries that list several versions or use aliases, and keep the old file until
+every tool works.
 
-## Performance
+## What works differently {#what-works-differently}
 
-asdf made (what I consider) a poor design decision to use shims that go between a call to a runtime
-and the runtime itself. e.g.: when you call `node` it will call an asdf shim file
-`~/.asdf/shims/node`,
-which then calls `asdf exec`, which then calls the correct version of node.
+### When versions are selected {#performance}
 
-These shims have terrible performance, adding ~120ms to every runtime call. `mise activate` does not
-use shims and instead
-updates `PATH` so that it doesn't have any overhead when simply calling binaries. These shims are
-the main reason that I wrote this. Note that in the demo GIF at the top of this README
-that `mise` isn't actually used when calling `node -v` for this reason. The performance is
-identical to running node without using mise.
+With `mise activate`, mise updates `PATH` and environment variables at the
+shell prompt and when you change directories, and later commands run the tool
+executables directly. asdf resolves a tool through a shim each time you call
+it. mise also has [shims](/dev-tools/shims.html#overview) for programs that
+need a stable executable path; they resolve the version on every call, as
+asdf's do.
 
-I don't think it's possible for asdf to fix these issues. The author of asdf did a great writeup
-of [performance problems](https://stratus3d.com/blog/2022/08/11/asdf-performance/). asdf is written
-in bash which certainly makes it challenging to be performant, however I think the real problem is
-the
-shim design. I don't think it's possible to fix that without a complete rewrite.
+### Plugins and security {#security}
 
-mise does call an internal command `mise hook-env` every time the directory has changed, but because
-it's written in Rust, this is very quick—taking ~10ms on my machine. 4ms if there are no changes,
-14ms if it's
-a full reload.
+An asdf plugin is a shell script that runs on your machine whenever you
+install a tool, so you trust its maintainer as well as the tool's publisher.
+mise installs most registry tools through built-in backends with no plugin.
+Some backends also verify what they download: packslip checks a signed release
+manifest, and aqua applies the checksum, cosign, SLSA, or attestation checks
+its registry declares. Verification depends on the tool, so check
+`mise tool <name>`. See [Security](/security.html).
 
-tl;dr: asdf adds overhead (~~120ms) when calling a runtime, mise adds a small amount of overhead (~~
-5ms)
-when the prompt loads.
+### Windows {#windows-support}
 
-## Windows support
+mise runs natively on Windows for tools and backends that publish Windows
+builds. asdf plugins are shell scripts and need a Unix environment; mise does
+not make them work natively on Windows. See
+[Installing mise](/installing-mise.html) for Windows setup.
 
-asdf does not run on Windows at all. With mise, tools using non-asdf backends can support Windows.
-Of course, this means the tool
-vendor must provide Windows binaries but if they do, and the backend isn't asdf, the tool should
-work on Windows.
+### Tools without an asdf plugin {#extra-backends}
 
-## Security
+Use a registry name when one exists, or choose a package source explicitly:
 
-asdf plugins are insecure. They typically are written by individuals with no ties to the vendors
-that provide the underlying tool.
-Where possible, mise does not use asdf plugins and instead uses backends like aqua and github which do
-not require separate plugins.
-
-Aqua tools include native Cosign/SLSA/Minisign/GitHub attestation verification built into mise.
-See [SECURITY](https://github.com/jdx/mise/blob/main/SECURITY.md) for more information.
-
-## Command Compatibility
-
-In nearly all places you can use the exact syntax that works in asdf, however this likely won't
-show up in the help or CLI reference. If you're coming from asdf and comfortable with that way of
-working you can almost always use the same syntax with mise, e.g.:
-
-```sh
-mise install node 20.0.0
-mise local node 20.0.0
+```toml [mise.toml]
+[tools]
+node = "24"
+ripgrep = "latest"
+"npm:prettier" = "3"
 ```
 
-UPDATE (2025-01-01): asdf-go (0.16+) actually got rid of `asdf global|local` entirely in favor of
-`asdf set` which we can't support since we already have a command named `mise set`. mise command
-compatibility will likely not be as good with asdf-go 0.16+.
-
-It's not recommended though. You almost always want to modify config files and install things so
-`mise use node@20` saves an extra command. Also, the "@" in the command is preferred since it allows
-you to install multiple tools at once: `mise use|install node@20 node@18`. Also, there are edge
-cases
-where it's not possible—or at least very challenging—for us to definitively know which syntax is
-being
-used and so we default to mise-style. While there aren't many of these, asdf-compatibility is done
-as a "best-effort" in order to make transitioning from asdf feel familiar for those users who can
-rely on their muscle memory. Ensuring asdf-syntax works with everything is not a design goal.
-
-## Extra backends
-
-mise has support for backends other than asdf plugins. For example you can install CLIs
-directly from cargo and npm:
-
-```sh
-mise use -g cargo:ripgrep@14
-mise use -g npm:prettier@3
-```
+Prettier needs Node.js at runtime, so both are declared. Other
+[backends](/dev-tools/backends/) install release binaries, Python CLIs, Rust
+crates, and private tools.

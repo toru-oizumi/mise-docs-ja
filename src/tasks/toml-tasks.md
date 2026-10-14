@@ -1,244 +1,192 @@
 ---
 title: TOML タスク
+description: "Define short commands and task groups in the [tasks] table of mise.toml."
 upstreamPath: docs/tasks/toml-tasks.md
 upstreamUrl: https://mise.jdx.dev/tasks/toml-tasks.html
-upstreamRef: 1c7db9f9
-upstreamDate: "2026-08-12"
+upstreamRef: 5749c813
+upstreamDate: "2026-10-13"
 ---
 
-<!-- verify-allow: フラグ -->
-<!-- このページでは usage spec の {{option()}} と {{flag()}} が別概念として並ぶため、
-     flag を「フラグ」と訳している。理由は glossary.md を参照 -->
+# TOML タスク {#toml-tasks}
 
-# TOML タスク {#toml-based-tasks}
+コマンドが1〜2行に収まるタスクや、主に他のタスクを実行するタスクは `mise.toml` に定義します。より長いスクリプトは [ファイルタスク](/tasks/file-tasks.html) に移すと、エディターでハイライトや lint ができます。
 
-タスクは `mise.toml` ファイルの中でさまざまな方法で定義できます。単純なタスクは `[tasks]` セクションに書き込め、より詳細なタスクはそれぞれ専用のセクションを持ちます。
+## タスクの定義 {#define-a-task}
 
-## 単純なタスクの例 {#trivial-task-examples}
+最も短い形式では、タスク名をコマンドに対応付けます。
 
-```mise-toml [mise.toml]
+```toml [mise.toml]
+[tasks]
 build = "cargo build"
 test = "cargo test"
 lint = "cargo clippy"
 ```
 
-## 詳細なタスクの例 {#detailed-task-examples}
+プロパティを追加するには、タスクに専用のテーブルを与えます。
 
 ```mise-toml [mise.toml]
-[tasks.cleancache]
-run = "rm -rf .cache"
-hide = true # hide this task from the list
-
-[tasks.clean]
-depends = ['cleancache']
-run = "cargo clean" # runs as a shell command
-
 [tasks.build]
-description = 'Build the CLI'
+description = "Build the CLI"
 run = "cargo build"
-alias = 'b' # `mise run b`
-
-[tasks.test]
-description = 'Run automated tests'
-# multiple commands are run in series
-run = [
-    'cargo test',
-    './scripts/test-e2e.sh',
-]
-dir = "{{cwd}}" # run in user's cwd, default is the project's base directory
-
-[tasks.lint]
-description = 'Lint with clippy'
-env = { RUST_BACKTRACE = '1' } # env vars for the script
-# you can specify a multiline script instead of individual commands
-run = '''
-#!/usr/bin/env bash
-cargo clippy
-'''
-
-[tasks.ci] # only dependencies to be run
-description = 'Run CI tasks'
-depends = ['build', 'lint', 'test']
-
-[tasks.release]
-confirm = 'Are you sure you want to cut a new release?'
-description = 'Cut a new release'
-file = 'scripts/release.sh' # execute an external script
 ```
 
-共通の引数を定義するには、[環境変数](/environments/) や [`vars`（原文）](https://mise.jdx.dev/tasks/task-configuration.html#vars) を使えます。
+以下の各プロパティには例を1つずつ示します。すべてのプロパティは [タスク設定のリファレンス（原文）](https://mise.jdx.dev/tasks/task-configuration.html) に一覧があります。
 
-```mise-toml [mise.toml]
-[env]
-VERBOSE_ARGS = '--verbose'
+### コマンドラインからのタスクの追加 {#add-a-task-from-the-command-line}
 
-# Vars can be shared between tasks like environment variables,
-# but they are not passed as environment variables to the scripts
-[vars]
-e2e_args = '--headless'
+[`mise tasks add`（原文）](https://mise.jdx.dev/cli/tasks/add.html) は `mise.toml` にタスクを書き込みます。
 
-[tasks.test]
-run = './scripts/test-e2e.sh {{vars.e2e_args}} $VERBOSE_ARGS'
-```
-
-## タスクの追加 {#adding-tasks}
-
-`mise.toml` ファイルを直接編集することもできますし、[`mise tasks add`（原文）](https://mise.jdx.dev/cli/tasks/add.html) を使うこともできます。
-
-```shell
+```sh
 mise tasks add pre-commit --depends "test" --depends "render" -- echo pre-commit
 ```
 
-これは `mise.toml` に以下を追加します。
+これにより、以下が追加されます。
 
-```shell
+```mise-toml [mise.toml]
 [tasks.pre-commit]
 depends = ["test", "render"]
 run = "echo pre-commit"
 ```
 
-## 共通のオプション {#common-options}
+## 共通のプロパティ {#common-properties}
 
-網羅的なリストは [タスクの設定（原文）](https://mise.jdx.dev/tasks/task-configuration.html) を参照してください。
+### コマンドの実行 {#run-commands}
 
-### run コマンド {#run-command}
-
-実行するスクリプトを指定します。単一のコマンドでも、コマンドの配列でも構いません。
+`run` は単一のコマンド、またはコマンドの配列です。
 
 ```mise-toml
 [tasks.test]
-run = 'cargo test'
+run = "cargo test"
 ```
-
-コマンドは直列に実行されます。コマンドが失敗すると、タスクは停止し、残りのコマンドは実行されません。
 
 ```mise-toml
 [tasks.test]
 run = [
-    'cargo test',
-    './scripts/test-e2e.sh',
+  "cargo test",
+  "./scripts/test-e2e.sh",
 ]
 ```
 
-`run_windows` キーを使うと、Windows で実行する別のコマンドを指定できます。
+配列の要素は順番に実行されます。いずれかが失敗するとタスクは停止し、残りの要素は実行されません。コマンドラインの追加の引数は最後の要素に渡されます。要素から別のタスクを実行することもできます。[ステップを順番に実行する（原文）](https://mise.jdx.dev/tasks/architecture.html#run-steps-in-order) を参照してください。
+
+Windows では `run_windows` が `run` の代わりに使われます。
 
 ```mise-toml
 [tasks.test]
-run = 'cargo test'
-run_windows = 'cargo test --features windows'
+run = "cargo test"
+run_windows = "cargo test --features windows"
 ```
 
-### 使用するディレクトリの指定 {#specifying-which-directory-to-use}
+### 作業ディレクトリ {#working-directory}
 
-[`dir`（原文）](https://mise.jdx.dev/tasks/task-configuration.html#dir) プロパティは、タスクが実行される `cwd` を決定します。<span v-pre>`dir = "{{cwd}}"`</span> を使うことで、タスクを実行した場所のディレクトリを使えます。
+デフォルトでは、タスクは [設定ルート](/configuration.html#config-root) から実行されます。mise を呼び出したディレクトリから実行するには、<span v-pre>`dir = "{{cwd}}"`</span> を設定します。
 
 ```mise-toml
 [tasks.test]
-run = 'cargo test'
+run = "cargo test"
 dir = "{{cwd}}"
 ```
 
-また、`MISE_ORIGINAL_CWD` には元の作業ディレクトリが設定され、タスクに渡されます。
+`MISE_ORIGINAL_CWD` にもそのディレクトリが入っています。他の値については [`dir`（原文）](https://mise.jdx.dev/tasks/task-configuration.html#dir) を参照してください。
 
-### 説明とエイリアスの追加 {#adding-a-description-and-alias}
-
-タスクに説明とエイリアスを追加できます。
+### 説明とエイリアス {#description-and-alias}
 
 ```mise-toml
 [tasks.build]
-description = 'Build the CLI'
+description = "Build the CLI"
 run = "cargo build"
-alias = 'b' # `mise run b`
+alias = "b"
 ```
 
-- このエイリアスはタスクを実行するために使えます
-- この説明は、引数なしで [`mise tasks ls`（原文）](https://mise.jdx.dev/cli/tasks/ls.html) や [`mise run`（原文）](https://mise.jdx.dev/cli/run.html) を実行したときに表示されます
+これで `mise run b` が `build` を実行します。説明は [`mise tasks ls`（原文）](https://mise.jdx.dev/cli/tasks/ls.html) と、タスク名を指定せずに [`mise run`（原文）](https://mise.jdx.dev/cli/run.html) を実行したときに開く選択画面に表示されます。
 
-```shell
-❯ mise run
-Tasks
-# Select a task to run
-# > build  Build the CLI
-#   test   Run the tests
-```
+補助的なタスクに `hide = true` を設定すると、`mise tasks ls` の一覧から除外されます。名前を指定すれば引き続き実行でき、`mise tasks ls --hidden` では一覧に表示されます。
 
 ### 依存関係 {#dependencies}
 
-タスクの依存関係を指定できます。依存関係はタスク自身より先に実行されます。依存関係が失敗した場合、タスクは実行されません。
+依存関係はタスクより先に実行されます。いずれかが失敗した場合、タスクは実行されません。
 
 ```mise-toml
 [tasks.build]
-run = 'cargo build'
+run = "cargo build"
 
 [tasks.test]
-depends = ['build']
+depends = ["build"]
+run = "cargo test"
 ```
 
-依存関係を指定する他の方法もあります。[wait_for（原文）](https://mise.jdx.dev/tasks/task-configuration.html#wait-for) と [depends_post（原文）](https://mise.jdx.dev/tasks/task-configuration.html#depends-post) を参照してください。
+[依存関係と実行順序（原文）](https://mise.jdx.dev/tasks/architecture.html) では、`depends` を `wait_for`、`depends_post`、実行ステップと比較しています。
 
 ### 環境変数 {#environment-variables}
 
-タスクに環境変数を指定できます。
+`env` は、そのタスクだけに変数を設定します。依存関係には設定されません。
 
 ```mise-toml
-[tasks.lint]
-description = 'Lint with clippy'
-env = { RUST_BACKTRACE = '1' } # env vars for the script
-# you can specify a multiline script instead of individual commands
-run = '''
-#!/usr/bin/env bash
-cargo clippy
-'''
+[tasks.test]
+env = { RUST_BACKTRACE = "1" }
+run = "cargo test"
 ```
 
-### Sources / Outputs {#sources-outputs}
+`[env]` で設定したプロジェクト全体の [環境変数](/environments/) は、すべてのタスクに渡されます。コマンドに必要だが環境にエクスポートすべきでない値には、[`[vars]`（原文）](https://mise.jdx.dev/configuration/vars.html) を使います。
 
-特定のファイルが変更されていない場合（最新の状態）にタスクの実行をスキップしたい場合は、`sources` と `outputs` を指定します。
+```mise-toml [mise.toml]
+[env]
+VERBOSE_ARGS = "--verbose"
 
-```mise-toml
-[tasks.build]
-description = 'Build the CLI'
-run = "cargo build"
-sources = ['Cargo.toml', 'src/**/*.rs'] # skip running if these files haven't changed
-outputs = ['target/debug/mycli']
+[vars]
+e2e_args = "--headless"
+
+[tasks.test]
+run = "./scripts/test-e2e.sh {{vars.e2e_args}} $VERBOSE_ARGS"
 ```
 
-[`mise watch`（原文）](https://mise.jdx.dev/cli/watch.html) と併用する場合は `sources` だけを使い、ソースが変更されたときにタスクを実行できます。
-[`task_source_files()`（原文）](https://mise.jdx.dev/templates.html#task-source-files) 関数を使うと、[テンプレート（原文）](https://mise.jdx.dev/templates.html) の中からタスクの `sources` の解決済みパスを取得できます。
+### sources と outputs {#sources-and-outputs}
+
+[`sources`（原文）](https://mise.jdx.dev/tasks/task-configuration.html#sources) と [`outputs`（原文）](https://mise.jdx.dev/tasks/task-configuration.html#outputs) を指定すると、出力が最新の状態である間、mise はタスクをスキップします。例については [最新の状態のタスクをスキップする](/tasks/running-tasks.html#skip-tasks-that-are-up-to-date) を、チェックの仕組みについては [タスクのキャッシュ（原文）](https://mise.jdx.dev/tasks/caching.html) を参照してください。`sources` だけを指定した場合も、[`mise watch`（原文）](https://mise.jdx.dev/cli/watch.html) が監視するファイルを指定することになります。run スクリプトの中では、[`task_source_files()`（原文）](https://mise.jdx.dev/templates.html#task-source-files) テンプレート関数が `sources` に一致するファイルを返します。
 
 ### 確認 {#confirmation}
 
-タスクを実行する前に表示するメッセージです。ユーザーはタスクが実行される前に確認を求められます。
+`confirm` は、タスク自身のコマンドを実行する前に確認を求めます。
 
-```mise-toml
+```toml
 [tasks.release]
-confirm = 'Are you sure you want to cut a new release?'
-description = 'Cut a new release'
-file = 'scripts/release.sh'
+confirm = "Are you sure you want to cut a new release?"
+description = "Cut a new release"
+file = "scripts/release.sh"
 ```
+
+確認が表示される時点で、タスクの `depends` はすでに実行されています。それらの処理より前に確認を求めるには、それらのタスクに確認を設定するか、[実行ステップ（原文）](https://mise.jdx.dev/tasks/architecture.html#run-steps-in-order) として呼び出します。[`confirm`（原文）](https://mise.jdx.dev/tasks/task-configuration.html#confirm) を参照してください。
+
+### デーモン <Badge type="warning" text="experimental" /> {#daemons}
+
+::: warning 実験的
+デーモンを使うには、`[settings]` の下に `experimental = true` が必要です。
+:::
+
+`daemons = "postgres"` を設定すると、[プロジェクトのデーモン（原文）](https://mise.jdx.dev/daemons.html#tasks-that-require-daemons) を起動し、準備ができるまで待ってからタスクを実行します。デーモンはその後も動き続けます。指定できる値については [`daemons`（原文）](https://mise.jdx.dev/tasks/task-configuration.html#daemons) を参照してください。
 
 ## シェルやインタプリタの指定 {#shell-shebang}
 
-シェルが `sh`、`bash`、`zsh` の場合、タスクは `set -e`（`set -o erropt`）で実行されます。つまり、いずれかのコマンドが失敗するとスクリプトは終了します。スクリプト内で `set +e` を実行することで、これを無効にできます。
+Unix では、インラインのコマンドはデフォルトの [`sh -o errexit -c`（原文）](https://mise.jdx.dev/configuration/settings.html#unix_default_inline_shell_args) で実行されるため、スクリプトは最初に失敗したコマンドで停止します。続行させるには `set +e` を追加します。
 
 ```mise-toml
-[tasks.echo]
+[tasks.cleanup]
 run = '''
 set +e
 cd /nonexistent
-echo "This will not fail the task"
+echo "This does not fail the task"
 '''
 ```
 
-スクリプトの実行に使う `shell` コマンドを指定できます（デフォルトは [`sh -c`（原文）](https://mise.jdx.dev/configuration/settings.html#unix_default_inline_shell_args) または [`cmd /c`（原文）](https://mise.jdx.dev/configuration/settings.html#windows_default_inline_shell_args)）。
+Windows でのデフォルトは [`cmd /c`（原文）](https://mise.jdx.dev/configuration/settings.html#windows_default_inline_shell_args) です。タスクのコマンドを別のシェルで実行するには、`shell` を設定します。
 
 ```mise-toml
 [tasks.lint]
-shell = 'bash -c'
+shell = "bash -c"
 run = "cargo clippy"
 ```
 
-あるいはシバンを使います。
+あるいは、スクリプトをシバンで始めます。
 
 ```mise-toml
 [tasks.lint]
@@ -248,7 +196,18 @@ cargo clippy
 '''
 ```
 
-シバンタスクはスクリプトファイルとして実行されます。[`usage` 仕様（原文）](https://mise.jdx.dev/tasks/task-arguments.html#usage-field) で定義されていない追加の引数は、Bash における `$1` や `$@` のような通常のスクリプト引数として渡されます。
+カスタムの `shell`（`sh -c` や `bash -c` であっても）、シバンスクリプト、Windows のデフォルトの `cmd /c` は、最初の失敗で停止しません。スクリプトに自分で `set -e`（または `set -euo pipefail`）を追加してください。
+
+```mise-toml
+[tasks.lint]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+cargo clippy
+'''
+```
+
+mise はシバンタスクをスクリプトファイルとして実行します。[usage spec（原文）](https://mise.jdx.dev/tasks/task-arguments.html) で定義されていない追加の引数は、Bash における `$1` や `$@` のような通常の引数としてスクリプトに渡されます。
 
 ```mise-toml
 [tasks.greet]
@@ -258,18 +217,22 @@ echo "hello $1"
 '''
 ```
 
-```shell
-$ mise run greet world
-hello world
+```sh
+mise run greet world
+# hello world
 ```
 
-`shebang`（または `shell`）を使うことで、異なる言語（Python、Node.js、Ruby など）でタスクを実行できます。
+シバンがない場合、mise は代わりに引数を最後のコマンドの末尾に追加するため、`$1` は空になります。
+
+### その他の言語 {#other-languages}
+
+シバンや `shell` を使うと、Python、Node.js、Ruby など任意のインタプリタでタスクを実行できます。
 
 ::: code-group
 
 ```mise-toml [python]
 [tools]
-python = 'latest'
+python = "latest"
 
 [tasks.python_task]
 run = '''
@@ -281,7 +244,7 @@ for i in range(10):
 
 ```mise-toml [python + uv]
 [tools]
-uv = 'latest'
+uv = "latest"
 
 [tasks.python_uv_task]
 run = '''
@@ -301,10 +264,10 @@ pprint([(k, v["title"]) for k, v in data.items()][:10])
 
 ```mise-toml [node]
 [tools]
-node = 'lts'
+node = "24"
 
 [tasks.node_task]
-shell = 'node -e'
+shell = "node -e"
 run = [
   "console.log('First line')",
   "console.log('Second line')",
@@ -313,7 +276,7 @@ run = [
 
 ```mise-toml [bun]
 [tools]
-bun = 'latest'
+bun = "latest"
 
 [tasks.bun_shell]
 description = "https://bun.sh/docs/runtime/shell"
@@ -328,38 +291,18 @@ await $`cat < ${response} | wc -c`; // 1256
 
 ```mise-toml [deno]
 [tools]
-deno = 'latest'
+deno = "latest"
 
 [tasks.deno_task]
-description = "A more complex task using Deno imports"
 run = '''
 #!/usr/bin/env -S deno run
-import ProgressBar from "jsr:@deno-library/progress";
-import { delay } from "jsr:@std/async";
-
-if (!confirm('Start download?')) {
-    Deno.exit(1);
-}
-
-const progress = new ProgressBar({ title:  "downloading:", total: 100 });
-let completed = 0;
-async function download() {
-  while (completed <= 100) {
-    await progress.render(completed++);
-    await delay(10);
-  }
-}
-await download();
+console.log(`Hello from Deno ${Deno.version.deno}`)
 '''
-# ❯ mise run deno_task
-# [download_task] $ import ProgressBar from "jsr:@deno-library/progress";
-# Start download? [y/N] y
-# downloading: ...
 ```
 
 ```mise-toml [ruby]
 [tools]
-ruby = 'latest'
+ruby = "latest"
 
 [tasks.ruby_task]
 run = '''
@@ -370,207 +313,72 @@ puts 'Hello, ruby!'
 
 :::
 
-::: details シバンとは？ `#!/usr/bin/env` と `#!/usr/bin/env -S` の違いとは？
+::: details シバンとは？ `-S` は何をするのか？
 
-シバンとは、スクリプトファイルの先頭にある `#!` という文字列で、そのスクリプトを解釈・実行するために使うプログラムをシステムに伝えるものです。
-[env コマンド](https://manpages.ubuntu.com/manpages/jammy/man1/env.1.html) は GNU Coreutils に由来します。`mise` は `env` を使いませんが、同様に振る舞います。
+シバンとは、スクリプトの先頭にある `#!` という文字列で、そのスクリプトを解釈するプログラムを指定するものです。`#!/usr/bin/env python` は、`PATH` にある `python` でスクリプトを実行します。Linux と macOS ではシステムがシバン行を実行するため、[`env`](https://manpages.ubuntu.com/manpages/jammy/man1/env.1.html) が `PATH` から `python` を見つけます。Windows にはシバンがありません。mise がその行を読み取り、先頭の `/usr/bin/env` または `/usr/bin/env -S` を取り除いて、指定されたインタプリタを自分で起動します。
 
-例えば、`#!/usr/bin/env python` は `PATH` にある Python インタプリタでスクリプトを実行します。
-
-`-S` フラグは、インタプリタに複数の引数を渡せるようにします。行の残りを1つの引数文字列として扱い、それを分割します。
-
-これは、インタプリタのフラグやオプションを指定する必要がある場合に便利です。
-例: `#!/usr/bin/env -S python -u` は、バッファなしの出力で Python を実行します。
+`-S` は行の残りを個別の引数に分割するため、インタプリタにオプションを渡せます。例えば、`#!/usr/bin/env -S python -u` は、バッファなしの出力で Python を実行します。
 
 :::
 
+### シェルを介さずに実行される単純なコマンド {#simple-commands-run-without-a-shell}
+
+Unix では、タスクがデフォルトのシェルを使う場合、mise は `node build.js` のような単純なインラインのコマンドを `sh` を介さずに直接起動することがあります。シェルの構文（クォート、展開、演算子、ビルトイン）を使うコマンドや、`ENV` または `BASH_ENV` が設定された状態で実行されるコマンドは、引き続きシェルを経由します。サンドボックス化されたタスクや、`cache.audit = true` のタスクも同様です。タスクの `shell`、`mise run --shell`、`unix_default_inline_shell_args` 設定項目は、デフォルトと同じ値を指定していても常にシェルを使います。そのため、`PATH` 上の `sh` という名前のラッパーを必ず実行させる必要がある場合は、これらのいずれかを設定してください。
+
 ## ファイルやリモートスクリプトの使用 {#using-a-file-or-remote-script}
 
-タスクとして実行するファイルを指定できます。
+`file` は、インラインのコマンドの代わりにスクリプトを実行します。
 
-```mise-toml
+```toml
 [tasks.release]
-description = 'Cut a new release'
-file = 'scripts/release.sh' # execute an external script
+description = "Cut a new release"
+file = "scripts/release.sh"
 ```
 
 ### リモートタスク {#remote-tasks}
 
-タスクファイルは複数のプロトコルでリモートから取得できます。
+`file` では URL からスクリプトを取得することもできます。mise はスクリプトをダウンロードして実行するため、信頼できる取得元だけを使ってください。
 
 #### HTTP {#http}
 
-```mise-toml
+```toml
 [tasks.build]
 file = "https://example.com/build.sh"
 ```
 
-ファイルはダウンロードされて実行される点に注意してください。取得元を信頼できることを必ず確認してください。
-
-#### Git <Badge type="warning" text="experimental" /> {#git}
+#### Git {#git}
 
 ::: code-group
 
-```mise-toml [ssh]
+```toml [ssh]
 [tasks.build]
 file = "git::ssh://git@github.com/myorg/example.git//myfile?ref=v1.0.0"
 ```
 
-```mise-toml [https]
+```toml [https]
 [tasks.build]
 file = "git::https://github.com/myorg/example.git//myfile?ref=v1.0.0"
 ```
 
 :::
 
-URL の形式は `git::<protocol>://<url>//<path>?<ref>` というパターンに従う必要があります。
-
-必須フィールド:
-
-- `protocol`: git リポジトリの URL です。
-- `url`: git リポジトリの URL です。
-- `path`: リポジトリ内のファイルへのパスです。
-
-オプションフィールド:
-
-- `ref`: git のリファレンス（ブランチ、タグ、コミット）です。
+URL の形式は `git::<protocol>://<repository>.git//<path>?ref=<ref>` で、`ref` は省略可能なブランチ、タグ、コミットです。すべてのフィールドについては [Git URL の構文（原文）](https://mise.jdx.dev/tasks/task-discovery.html#git-url-syntax) を参照してください。
 
 #### キャッシュ {#cache}
 
-各タスクファイルは `MISE_CACHE_DIR` ディレクトリにキャッシュされます。ファイルが更新されても、キャッシュがクリアされない限り再ダウンロードされません。
-
-:::tip
-`mise cache clear` を実行することでキャッシュをリセットできます。
-:::
-
-`MISE_TASK_REMOTE_NO_CACHE` 環境変数を使うと、リモートタスクのキャッシュを無効にできます。
+mise は各リモートタスクファイルを `MISE_CACHE_DIR` の下にキャッシュし、`mise cache clear` を実行するまで再ダウンロードしません。最新のものを取得するには、`mise run --no-cache` を渡すか、[`task.remote_no_cache`（原文）](https://mise.jdx.dev/configuration/settings.html#task.remote_no_cache)（`MISE_TASK_REMOTE_NO_CACHE=1`）を設定します。
 
 ## 引数 {#arguments}
 
-::: tip
-タスクの引数についての包括的な情報は、専用の [タスクの引数（原文）](https://mise.jdx.dev/tasks/task-arguments.html) ページを参照してください。
-:::
-
-デフォルトでは、引数は `run` 配列の最後のスクリプトに渡されます。そのため、タスクが以下のように定義されている場合、
-
-```mise-toml
-[tasks.test]
-run = ['cargo test', './scripts/test-e2e.sh']
-```
-
-`mise run test foo bar` を実行すると、`foo bar` は `./scripts/test-e2e.sh` には渡されますが、`cargo test` には渡されません。
-
-### 推奨: usage フィールドの使用 {#recommended-using-the-usage-field}
-
-引数を定義する推奨の方法は `usage` フィールドを使うことです。
+引数は `usage` spec で定義します。mise は引数を解析し、それぞれの値を `usage_*` 環境変数としてコマンドに渡します。
 
 ```mise-toml
 [tasks.test]
 usage = '''
 arg "<file>" help="Test file to run" default="all"
 flag "--format <format>" help="Output format" default="text"
-flag "-v --verbose" help="Enable verbose output"
 '''
-run = 'cargo test ${usage_file?} --format ${usage_format?}'
+run = 'echo "Testing ${usage_file?} with format ${usage_format?}"'
 ```
 
-usage フィールドで定義された引数は、`usage_` を前置した環境変数として利用できます。
-
-完全なドキュメントは [タスクの引数（原文）](https://mise.jdx.dev/tasks/task-arguments.html#usage-field) ページを参照してください。
-
-### Tera テンプレート関数 <Badge type="danger" text="deprecated" /> {#tera-template-functions}
-
-::: danger Deprecated - Removal in 2027.5.0
-run スクリプトで Tera テンプレート関数（`arg()`、`option()`、`flag()`）を使うことは**非推奨**であり、**mise 2027.5.0 で削除されます**。2026.5.0 以上のバージョンでは非推奨の警告が表示されます。
-
-**削除される理由:**
-
-- テンプレート関数はスペック収集時に空文字列を返します（2パス解析の問題）
-- 複雑で予測できないシェルのエスケープ規則
-- TOML タスクとファイルタスクの間で動作が一貫していません
-
-**代わりに `usage` フィールドを使うように移行してください。** [移行ガイド（原文）](https://mise.jdx.dev/tasks/task-arguments.html#tera-templates) を参照してください。
-:::
-
-<details>
-<summary>非推奨の Tera テンプレート構文を見る（非推奨）</summary>
-
-Tera テンプレート関数（非推奨）を使って引数を定義できます。
-
-```mise-toml
-[tasks.test]
-run = [
-    'cargo test {{arg(name="cargo_test_args", var=true)}}',
-    './scripts/test-e2e.sh {{option(name="e2e_args")}}',
-]
-```
-
-`mise run test foo bar` を実行すると、`foo bar` は `cargo test` に渡されます。
-`mise run test --e2e-args baz` は `baz` を `./scripts/test-e2e.sh` に渡します。
-
-#### 位置引数 {#positional-arguments}
-
-これらはスクリプト内で <span v-pre>`{{arg()}}`</span> によって定義されます。順序が重要な位置引数のために使われます。
-
-例:
-
-```mise-toml
-[tasks.test]
-run = 'cargo test {{arg(name="file")}}'
-# execute: mise run test my-test-file
-# runs: cargo test my-test-file
-```
-
-- `i`: 引数のインデックスです。引数の順序を指定するために使えます。デフォルトでは
-  スクリプト内で定義された順序になります。
-- `name`: 引数の名前です。ヘルプ/エラーメッセージに使われます。
-- `var`: `true` の場合、複数の引数を渡せます。
-- `default`: 引数が指定されない場合のデフォルト値です。
-
-#### オプション {#options}
-
-これらはスクリプト内で <span v-pre>`{{option()}}`</span> によって定義されます。順序が関係ない名前付き引数のために使われます。
-
-例:
-
-```mise-toml
-[tasks.test]
-run = 'cargo test {{option(name="file")}}'
-# execute: mise run test --file my-test-file
-# runs: cargo test my-test-file
-```
-
-- `name`: 引数の名前です。ヘルプ/エラーメッセージに使われます。
-- `var`: `true` の場合、複数の値を渡せます。
-- `default`: オプションが指定されない場合のデフォルト値です。
-
-#### フラグ {#flags}
-
-フラグはオプションと似ていますが、値を取りません。スクリプト内で <span v-pre>
-`{{flag()}}`</span> によって定義されます。
-
-例:
-
-```mise-toml
-[tasks.echo]
-run = 'echo {{flag(name="myflag")}}'
-# execute: mise run echo --myflag
-# runs: echo true
-```
-
-```mise-toml
-[tasks.maybeClean]
-run = '''
-if [ '{{flag(name='clean')}}' = 'true' ]; then
-  echo 'cleaning'
-fi
-'''
-# execute: mise run maybeClean --clean
-# runs: echo cleaning
-```
-
-- `name`: フラグの名前です。ヘルプ/エラーメッセージに使われます。
-
-値はフラグが渡された場合は `true`、そうでない場合は `false` になります。
-
-</details>
+spec の構文については [タスクの引数（原文）](https://mise.jdx.dev/tasks/task-arguments.html) を参照してください。spec がない場合、追加の引数はコマンドに [転送](/tasks/running-tasks.html#pass-arguments) されます。`run` でまだ `arg()`、`option()`、`flag()` を使っているタスクは、[移行ガイド（原文）](https://mise.jdx.dev/tasks/task-arguments.html#tera-templates) に従ってください。

@@ -93,6 +93,22 @@
 | schema | スキーマ | |
 | fuzzy matching | あいまい一致（fuzzy matching） | 初出時のみ原語併記 |
 | Tera | Tera | テンプレートエンジン名。訳さない |
+| version request | バージョン指定 | `mise.toml` に書く `"24"` や `latest`。解決後の具体的なバージョンと区別する |
+| config root | 設定ルート | |
+| config environment | 設定環境 | `MISE_ENV` で選ぶもの。`environment`（環境変数の文脈）と区別する |
+| lazy tool | 遅延ツール | `lazy = true`。初出時に「遅延ツール（lazy tool）」と併記 |
+| run steps | 実行ステップ | タスクの順次実行 |
+| paranoid mode | パラノイドモード | |
+| fragment（conf.d） | フラグメント | verify の「フラグ」検出の対象外 |
+| directive（env） | ディレクティブ | `_.file` / `_.path` 等 |
+| secret | シークレット | |
+| daemon | デーモン | |
+| wrapper（script） | ラッパー（スクリプト） | |
+| startup file | 起動ファイル | `~/.bashrc` 等。rc ファイルの総称として |
+| login shell | ログインシェル | |
+| editor | エディター | 「エディタ」と揺らさない |
+| extension（VS Code） | 拡張機能 | |
+| precedence | 優先順位 | |
 
 ## 訳さないもの（原語のまま）
 
