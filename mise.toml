@@ -5,7 +5,10 @@ min_version = "2025.1.0"
 # vitepress / vite は node を前提にした挙動が残っているので node も入れておく。
 bun = "1.4.3"
 node = "24"
-oxlint = "1.88.0"
+# oxlint は aqua 経由だと解決できない。oxc が 1.78 より後のリリースでタグを apps_v* から
+# oxlint_v* / oxfmt_v* に分けたが、aqua のレジストリが apps_v* を前提にしているため。
+# oxfmt と同じく npm から入れる（node は上で入れている）
+"npm:oxlint" = "1.88.0"
 oxfmt = "0.73.0"
 
 [tasks.install]
