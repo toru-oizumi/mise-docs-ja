@@ -1,62 +1,84 @@
 ---
 title: タスクの概要
+description: "Run builds, tests, and deployments with your project's tools and environment."
 upstreamPath: docs/tasks/index.md
 upstreamUrl: https://mise.jdx.dev/tasks/
-upstreamRef: 1c7db9f9
-upstreamDate: "2026-08-12"
+upstreamRef: 5749c813
+upstreamDate: "2026-10-13"
 ---
 
 # タスクの概要 {#tasks}
 
-> ビルド、テスト、リント、デプロイ、そして日々の開発ワークフローのために、プロジェクトの _タスク_ を定義し、実行します。
+タスクとは、プロジェクトのツールと環境変数を使って実行される、名前付きのコマンドまたはスクリプトです。ビルド、テスト、リンター、開発サーバーなど、チームメンバーと CI が同じ方法で実行すべきコマンドにタスクを使います。
 
-タスクは `mise.toml` ファイルの中で定義することも、スタンドアロンのシェルスクリプトとして定義することもできます。これは、リンター、テスト、ビルダー、サーバーなど、プロジェクト固有のタスクを実行する際に便利です。もちろん、mise で起動したタスクには mise の環境が含まれます — つまり `mise.toml` で定義されたツールや環境変数です。
+## 最初のタスクを実行する {#run-your-first-task}
 
-mise のタスクランナーで気に入っている機能を紹介します。
+プロジェクトディレクトリの `mise.toml` にタスクを追加します。
 
-- 依存関係を並列にビルドできる点 — デフォルトで、追加の設定は不要
-- 変更が無いときの再ビルドを避けられる点 — 最終更新時刻によるチェックで、最小限の設定で済む
-- 変更を検知して自動的に再ビルドする [mise watch](/tasks/running-tasks.html#watching-files) が使える点 — 設定は不要だが、あると便利
-- シンタックスハイライトやリンティング/チェックのサポートが無い yml/json/toml の文字列の中身としてではなく、実際の bash スクリプトファイルとしてタスクを書ける点
-
-タスクを定義する方法は2つあります。[`mise.toml` ファイルの内部](/tasks/toml-tasks.html)で定義する方法と、[スタンドアロンのシェルスクリプト](/tasks/file-tasks.html)として定義する方法です。再利用可能なタスク定義を作るために、[タスクテンプレート（原文）](https://mise.jdx.dev/templates.html)を使うこともできます。
-
-## `mise.toml` ファイルでのタスク {#tasks-in-mise-toml-files}
-
-タスクは `mise.toml` ファイルの `[tasks]` セクションで定義します。
-
-```toml [mise.toml]
-[tasks.build]
-description = "Build the CLI"
-run = "cargo build"
+```mise-toml [mise.toml]
+[tasks.hello]
+description = "Check that task execution works"
+run = "echo hello from mise"
 ```
 
-その後、`mise run build`（既存のコマンドと衝突しなければ `mise build` でも可）でタスクを実行できます。
+[`mise run`（原文）](https://mise.jdx.dev/cli/run.html) で実行します。
 
-- 詳細は [TOML タスク](/tasks/toml-tasks.html) を参照してください。
-- タスクの実行方法については [タスクの実行](/tasks/running-tasks.html) を参照してください。
+```sh
+mise run hello
+```
 
-## ファイルタスク {#file-tasks}
+```text
+[hello] $ echo hello from mise
+hello from mise
+```
 
-タスクはスタンドアロンのシェルスクリプトとしても定義できます。必要なのは、`mise-tasks` のような特定のディレクトリに `executable`（実行可能）なファイルを作成することだけです。
+mise は実行するコマンドを表示し、続いてそのコマンドの出力を表示します。シェルの有効化は必要ありません。`mise run` はプロジェクトの設定を読み込み、[`task.run_auto_install`（原文）](https://mise.jdx.dev/configuration/settings.html#task.run_auto_install) がオフでない限り、タスクの開始前に不足しているツールをインストールします。`mise tasks ls` でタスクの一覧を表示し、`mise tasks info hello` でタスクがどこで定義されているかを確認できます。
 
-```sh [mise-tasks/build]
+## タスクの形式を選ぶ {#choose-a-task-format}
+
+| 形式                                 | 使う場面                                                                          | 置き場所                                                        |
+| ------------------------------------ | --------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| [TOML タスク](/tasks/toml-tasks.html) | コマンドが1〜2行に収まる場合、またはタスクの大半が他のタスクの実行である場合。 | `mise.toml` 内の `[tasks.<name>]`                                 |
+| [ファイルタスク](/tasks/file-tasks.html) | スクリプトが長く、エディターのシンタックスハイライトやリントの恩恵を受けられる場合。 | `mise-tasks/` または別のタスクディレクトリにある実行可能なスクリプト |
+
+どちらの形式も同じランナーを使い、ほとんどのプロパティを共通して受け付けます。まず TOML で始め、スクリプトが大きくなったらファイルに移すとよいでしょう。どちらの形式も、[タスクテンプレート（原文）](https://mise.jdx.dev/tasks/templates.html)から共通の設定を継承できます。
+
+## タスクをスクリプトとして書く {#write-a-task-as-a-script}
+
+スクリプトを `mise-tasks/hello` として保存します。
+
+```sh [mise-tasks/hello]
 #!/usr/bin/env bash
-#MISE description="Build the CLI"
-cargo build
+#MISE description="Check that task execution works"
+echo "hello from a file task"
 ```
 
-TOML タスクと同様に、`mise run build` でタスクを実行できます。
-詳細は [ファイルタスクのリファレンス](/tasks/file-tasks.html) を参照してください。
+Linux と macOS では、`chmod +x mise-tasks/hello` で実行可能にしてから `mise run hello` を実行します。`hello` という名前は、このファイルか上記の TOML タスクのどちらか一方で定義し、両方で定義しないでください。Windows でどのファイルがタスクとして扱われるかは [ファイルタスク](/tasks/file-tasks.html#windows) で説明しています。
 
-## タスクに渡される環境変数 {#environment-variables-passed-to-tasks}
+## 依存関係でタスクをまとめる {#group-tasks-with-dependencies}
 
-以下の環境変数がタスクに渡されます。
+`depends` だけを持つタスクは、他のタスクを実行します。前提となるタスクは並列に実行される場合があり、`depends` 内の順序は実行順を決めません。
 
-- `MISE_ORIGINAL_CWD`: タスクが実行された元の作業ディレクトリ。
-- `MISE_CONFIG_ROOT`: タスクが定義された `mise.toml` ファイルを含むディレクトリ。設定ファイルのパスが `~/src/myproj/.config/mise.toml` のような形式であれば、`~/src/myproj` になります。
-- `MISE_PROJECT_ROOT`: タスクを定義するプロジェクトのルート。モノレポのサブプロジェクトのタスクの場合、これはそのサブプロジェクトのディレクトリであり、タスクがどのディレクトリから呼び出されたかにかかわらず安定しています。
-- `MISE_MONOREPO_ROOT`: モノレポのルート（`monorepo_root = true` の設定を含むディレクトリ）。モノレポ内でのみ設定されます。
-- `MISE_TASK_NAME`: 実行されているタスクの名前。
-- `MISE_TASK_DIR`: タスクスクリプトを含むディレクトリ。
-- `MISE_TASK_FILE`: タスクスクリプトへのフルパス。
+```mise-toml [mise.toml]
+[tasks.check]
+depends = ["format", "test"]
+
+[tasks.format]
+run = "echo checking formatting"
+
+[tasks.test]
+run = "echo running tests"
+```
+
+`mise run check` は `format` と `test` を実行します。`echo` コマンドはプロジェクトのチェックに置き換えてください。あるステップが終わってから次のステップを始める必要がある場合は、代わりに [実行ステップ（原文）](https://mise.jdx.dev/tasks/architecture.html#run-steps-in-order) を使います。
+
+## タスクのワークフローを組み立てる {#build-a-task-workflow}
+
+- [タスクの実行](/tasks/running-tasks.html): 名前やパターンでタスクを選択し、引数を渡し、並列度と出力を制御します。タスクには [タスクを説明する変数](/tasks/running-tasks.html#task-environment)も渡されます。
+- [タスクの引数（原文）](https://mise.jdx.dev/tasks/task-arguments.html): バリデーション、`--help`、自動補完を備えたコマンドラインインターフェースをタスクに持たせます。
+- [依存関係と実行順序（原文）](https://mise.jdx.dev/tasks/architecture.html): `depends`、`wait_for`、`depends_post`、実行ステップの中から選びます。
+- [タスクの検出と優先順位（原文）](https://mise.jdx.dev/tasks/task-discovery.html): mise がタスクをどこで見つけるか、どの定義が優先されるかを説明します。
+- [タスクテンプレート（原文）](https://mise.jdx.dev/tasks/templates.html): ツール、環境変数、引数を複数のタスクで共有します。
+- [タスクのキャッシュ（原文）](https://mise.jdx.dev/tasks/caching.html): 入力が変わっていない作業をスキップまたは復元します。
+- [モノレポのタスク（原文）](https://mise.jdx.dev/tasks/monorepo.html): 複数のプロジェクトルートにまたがってタスクを実行します。
+- [タスク設定リファレンス（原文）](https://mise.jdx.dev/tasks/task-configuration.html): すべてのタスクプロパティと `task.*` 設定項目を掲載しています。

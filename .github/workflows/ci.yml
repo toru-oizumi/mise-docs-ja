@@ -9,13 +9,13 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # mise のドキュメントサイトなので、ツールの用意は mise 自身に任せる。
       # bun / node / oxlint / oxfmt のバージョンは mise.toml で固定している。
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
-          version: 2026.8.3
+          version: 2026.10.9
 
       - run: mise run install
 

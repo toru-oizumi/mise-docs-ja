@@ -1,199 +1,216 @@
 ---
 title: タスクの実行
+description: "Run tasks with mise run, select them by name or pattern, pass arguments, and control parallelism and output."
+socialDescription: "Run tasks with mise run, select them by pattern, and control parallelism and output."
 upstreamPath: docs/tasks/running-tasks.md
 upstreamUrl: https://mise.jdx.dev/tasks/running-tasks.html
-upstreamRef: 1c7db9f9
-upstreamDate: "2026-08-12"
+upstreamRef: 5749c813
+upstreamDate: "2026-10-13"
 ---
 
 # タスクの実行 {#running-tasks}
 
-利用可能なタスクは `mise tasks` で確認できます。`hide=true` プロパティで隠されたタスクを表示するには、`--hidden` オプションを使います。
+[`mise run`（原文）](https://mise.jdx.dev/cli/run.html) でタスクを実行します。mise はタスクのツールと環境を読み込み、先に依存関係を実行し、互いに独立したタスクを並列に実行します。1回の実行の中で mise がタスクをどのように順序付けるかは、[依存関係と実行順序（原文）](https://mise.jdx.dev/tasks/architecture.html) で説明しています。
 
-タスクの依存関係は `mise tasks deps [tasks]...` で一覧表示できます。
+## タスクの検索と実行 {#find-and-run-tasks}
 
-タスクは `mise tasks run <task>`、`mise run <task>`、`mise r <task>`、または単に `mise <task>` で実行できます — ただし最後の形式は、スクリプトやドキュメントに書くべきではありません。将来の mise のバージョンでその名前のコマンドが追加された場合、タスクはそのコマンドに隠されてしまい、他の形式のいずれかで実行する必要が生じるためです。
+`mise tasks` は、現在のディレクトリで利用可能なタスクを一覧表示します。`hide = true` のタスクも含めるには `--hidden` を、各タスクがどこで定義されているかを見るには `--extended` を付けます。タスクは名前を指定して実行します。
 
-多くの mise ユーザーは、`alias mr='mise run'` のような `mise run` のエイリアスを持っています。
-
-デフォルトでは、タスクは最大4つの並列ジョブで実行されます。これは `--jobs` オプション、`jobs` 設定項目、または `MISE_JOBS` 環境変数でカスタマイズできます。出力は通常、タスクのラベルを前置した行単位になります。行単位で出力することで、並列実行の出力が混ざり合うのを避けています。ただし `--jobs == 1` の場合、出力は `interleave` に設定されます。
-
-stdout/stderr をそのまま出力したい場合は、`--output interleave`、`task.output` 設定項目、または `MISE_TASK_OUTPUT=interleave` を使ってください。
-
-出力の _スタイル_（`prefix`、`interleave`、`keep-order` など）は、_詳細度_（`--quiet`/`--silent`、`quiet`/`silent` 設定項目、またはタスクごとの `quiet`/`silent` フィールド）とは独立しています。両者は組み合わせて使えます。例えば `MISE_TASK_OUTPUT=prefix` と `--quiet` を組み合わせると、タスク名のプレフィックスを保ったまま mise 自身のメッセージを抑制できます。`--quiet` はもはやプレフィックスなしの出力を強制しません — 以前のプレフィックスなしの動作が欲しい場合は `--output quiet`（または `-o interleave`）を使ってください。
-
-標準入力（stdin）はデフォルトでは読み込まれません。これを有効にするには、必要なタスクに `raw = true` を設定します。これにより、そのタスクは他のどのタスクとも並列実行されなくなります — この場合、RWMutex が書き込みロックを取得します。また、これにより出力への redaction（値の削除）の適用も無効になります。
-
-タスクには追加の引数を渡せます。例えば、リリースモードで実行したい場合は次のようになります。
-
-```bash
-mise run build --release
+```sh
+mise run build
 ```
 
-厳密でバリデーションされたタスクインターフェースが必要な場合は、
-[`usage` フィールド（原文）](https://mise.jdx.dev/tasks/task-arguments.html#usage-field) を使って引数やオプションを定義してください。`usage` の指定が無い場合、追加の引数は
-タスクの実行方式に応じて次のように転送されます。
+### `mise run` の省略形 {#mise-run-shorthand}
 
-- `run` が配列の場合、引数はその最後の要素にのみ渡されます。
-- 通常のインラインシェルコマンドの場合、引数はコマンドの文字列に追加されます。
-- [shebang タスク](/tasks/toml-tasks#shell-shebang) はスクリプトファイルとして実行されるため、そのインタプリタが
-  通常の方法で引数を渡します — 例えば Bash では `$1` や `$@` として渡されます。
+`mise run build`、`mise r build`、`mise tasks run build`、`mise build` はいずれも `build` タスクを実行します。最後の形式はタスク名が mise のコマンドと一致しない間だけ機能し、後の mise のリリースでその名前のコマンドが追加される可能性があるため、スクリプトやドキュメントでは `mise run build` と書いてください。インタラクティブに使う場合は、`alias mr='mise run'` のようなシェルのエイリアスを使うと入力の手間を省けます。
 
-タスク名の後ろにあるものはすべてそのタスクに属するため、mise 自身のオプションはタスク名の
-_前_に置く必要があります — `mise run build --silent` ではなく `mise run --silent build` です。前者は
-`--silent` をタスクに渡してしまい、タスクがそれを定義していない限り `unexpected word: --silent` で失敗します。
-これは、タスクが mise のオプションと同じ名前のオプションを自由に定義できることも意味します。例えば、
-タスク独自の `--env` などです。
+### デフォルトタスクの実行 {#run-the-default-task}
 
-:::tip
-タスクには引数やオプションを定義でき、これによりバリデーション、パース、自動補完、ドキュメント生成が提供されます。
+タスク名を指定せずに `mise run` を実行すると、`default` という名前の、または `default` をエイリアスに持つタスクが実行されます。
 
-- [ファイルタスクにおける引数](/tasks/file-tasks#arguments)
-- [TOML タスクにおける引数](/tasks/toml-tasks#arguments)
+```mise-toml [mise.toml]
+[tasks.dev]
+alias = "default"
+run = "npm run dev"
+```
 
-`usage` CLI がインストールされていて mise の補完が動作していれば、タスクの自動補完は自動的に機能します。
+この設定では、`mise run` は `dev` を実行します。`default` タスクが存在しない場合、インタラクティブなターミナルではタスクセレクターが開き、非インタラクティブな実行は `no task default found` で失敗します。
 
-Markdown ドキュメントは [`mise generate task-docs`（原文）](https://mise.jdx.dev/cli/generate/task-docs.html) で生成できます。
-:::
+### 複数のタスクの実行 {#run-several-tasks}
 
-複数のタスクや引数は、この `:::` 区切り文字で分けられます。
+それぞれ独自の引数を持つ複数のタスクを、`:::` で区切ります。
 
-```bash
+```sh
 mise run build arg1 arg2 ::: test arg3 arg4
 ```
 
-タスクを指定しない場合、mise は "default" という名前のタスクを実行します — ただしそれは "default" という名前のタスクを作成している場合に限ります。別のタスクを "default" のエイリアスにすることもできます。
+どれかが別のタスクに依存していない限り、タスクは並列に実行されます。
 
-```bash
-mise run
-```
+## 名前によるタスクの選択 {#select-tasks-by-name}
 
-## タスクのグルーピング {#task-grouping}
+`test:unit` や `test:e2e` のように、関連するタスクに `:` 区切りのグループで名前を付けると、1つのパターンでそれらを選択できます。`:` を含む TOML のキーにはクォートが必要です。
 
-タスクは、`:` で区切った名前のプレフィックスを使うことで、意味的にグループ化できます。
-例えば、テスト関連のタスクはすべて `test:` で始められます。ネストしたグループ化を
-使えば、グループをさらに細分化し、パターンマッチングを単純化することもできます。
-例えば `mise run test:**:local` を実行すると、`test:units:local`、
-`test:integration:local`、`test:e2e:happy:local` にマッチします
-（詳細は [ワイルドカード](#wildcards) を参照してください）。
-
-::: tip
-TOML のキーはクォートしないと `:` を含められないため、`mise.toml` ではクォートしたキーを使ってください。
-
-```toml
+```mise-toml [mise.toml]
 [tasks."test:unit"]
-run = 'cargo test --lib'
+run = "cargo test --lib"
 ```
 
-:::
+ファイルタスクはサブディレクトリからグループを得ます。[ファイルタスク](/tasks/file-tasks.html#task-grouping) を参照してください。
 
-## ワイルドカード {#wildcards}
+### ワイルドカード {#wildcards}
 
-タスクを実行するとき、またはタスクの依存関係を指定するときには、glob 形式のワイルドカードが
-サポートされます。
+`mise run` と、`depends` のようなタスクの依存関係では、glob パターンを使えます。
 
-使用できるワイルドカードパターン:
+| パターン          | マッチするもの                                  |
+| ---------------- | --------------------------------------------- |
+| `?`              | 任意の1文字                                     |
+| `*`              | 1つの `:` 区切りグループ内の任意の文字列            |
+| `**`             | 任意の数の完全なグループ                          |
+| `{a,b}`          | いずれかのパターン                               |
+| `[abc]`, `[a-z]` | 集合または範囲に含まれる1文字                      |
+| `[!abc]`         | 集合または範囲に含まれない1文字                    |
 
-- `?` は任意の1文字にマッチします
-- `*` は、単一の `:` 区切りグループ内で0文字以上の文字にマッチします
-- `**` は、0個以上の完全な `:` 区切りグループにマッチします
-- `{glob1,glob2,...}` は、カンマ区切りの glob パターンのいずれかにマッチします
-- `[ab,...]` は、文字または `[a-z]` のような範囲のいずれかにマッチします
-- `[!ab,...]` は、その文字セットに含まれない任意の文字にマッチします
+シェルに展開されないよう、パターンはクォートしてください。
 
-### 例 {#examples}
-
-`mise run generate:{completions,docs:*}`
-
-グループ化されたタスクでは、正確に1つのグループだけが変化しうる場合は `*` を使い、
-複数のグループにわたってマッチしうる場合は `**` を使います。
-
-```bash
-# Matches test:units:local, but not test:e2e:happy:local
-mise run 'test:*:local'
-
-# Matches both test:units:local and test:e2e:happy:local
-mise run 'test:**:local'
+```sh
+mise run 'test:*:local'                   # test:units:local, not test:e2e:happy:local
+mise run 'test:**:local'                  # test:units:local and test:e2e:happy:local
+mise run 'generate:{completions,docs:*}'  # generate:completions and every generate:docs:* task
 ```
 
-古い mise のバージョンで、ネストしたタスクグループへのマッチに `*` を使っていたパターンが
-ある場合は、再帰的な動作を維持するために `**` に置き換えてください。
+パターンは `depends` でも使えます。
 
-依存関係と組み合わせる場合:
-
-```toml
-[tasks."lint:eslint"] # using a ":" means we need to add quotes
+```mise-toml [mise.toml]
+[tasks."lint:eslint"]
 run = "eslint ."
+
 [tasks."lint:prettier"]
 run = "prettier --check ."
+
 [tasks.lint]
 depends = ["lint:*"]
-wait_for = ["render"] # does not add as a dependency, but if it is already running, wait for it to finish
 ```
 
-## ファイル変更時の実行 {#running-on-file-changes}
+モノレポでは、`//...:test` のように、パターンでプロジェクトを選択することもできます。[モノレポタスク（原文）](https://mise.jdx.dev/tasks/monorepo.html) を参照してください。
 
-タスクが使用するファイルが変更されたときにだけそのタスクを実行できると便利な場合がよくあります。例えば、
-".rs" ファイルが変更されたときにだけ `cargo build` を実行したい、というような場合です。これは次のような設定で実現できます。
+## 引数の受け渡し {#pass-arguments}
 
-```toml
+タスク名の後ろの引数はタスクに渡されます。
+
+```sh
+mise run build --release
+```
+
+タスクにバリデーションされたインターフェースを持たせるには、[usage spec（原文）](https://mise.jdx.dev/tasks/task-arguments.html) で引数を定義します。spec によって、タスクには `--help`、[シェルの自動補完（原文）](https://mise.jdx.dev/shell-setup.html)、[生成されたドキュメント（原文）](https://mise.jdx.dev/cli/generate/task-docs.html) も備わります。spec がない場合、mise は追加の引数をタスクの形式に応じて次のように転送します。
+
+- `run` が配列の場合、引数はその最後の要素にのみ渡されます。
+- インラインコマンドの場合、mise は引数をシェル向けにクォートしたうえで、コマンドに追加します。
+- [シバンスクリプト](/tasks/toml-tasks.html#shell-shebang) やファイルタスクは、Bash の `$1` や `$@` のように、引数をスクリプトの引数として受け取ります。
+
+mise 自身のオプションはタスク名の前に置きます（`mise run --silent build`）。タスク名の後ろにあるものはすべてタスクに属します。usage spec のないタスクは `--silent` を引数として受け取り、spec のあるタスクは、その spec がそのオプションを定義していない限り `unexpected word: --silent` で失敗します。タスクは `--env` のように、mise のオプションと同じ名前のオプションを定義できます。
+
+## 実行の制御 {#control-a-run}
+
+次の [`mise run`（原文）](https://mise.jdx.dev/cli/run.html) のオプションは、実行の進み方を変更します。
+
+| オプション                     | 効果                                                                                                                                                                                                                 |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-j`, `--jobs <N>`            | 最大 N 個のタスクを同時に実行します。デフォルトは [`jobs`（原文）](https://mise.jdx.dev/configuration/settings.html#jobs) 設定項目（`MISE_JOBS`）の値です。                                                                  |
+| `-f`, `--force`               | タスクの [出力が最新](#skip-tasks-that-are-up-to-date) の場合でも、タスクを実行します。                                                                                                                                  |
+| `-n`, `--dry-run`             | 何も実行せずに、各タスクのコマンドを実行順に表示します。                                                                                                                                                                  |
+| `-c`, `--continue-on-error`   | タスクが失敗した後も実行を続けます。[タスクが失敗したとき](#when-a-task-fails) を参照してください。                                                                                                                         |
+| `--skip-deps`                 | 依存関係を含めず、指定したタスクだけを実行します。                                                                                                                                                                       |
+| `--timeout <DURATION>`        | `30s` や `5m` のような時間が経過した後に、実行全体を停止します。[`task.timeout`（原文）](https://mise.jdx.dev/configuration/settings.html#task.timeout) 設定項目より優先されます。                                         |
+| `-C`, `--cd <DIR>`            | mise が別のディレクトリで起動したかのように実行します。                                                                                                                                                                  |
+| `-t`, `--tool <TOOL@VERSION>` | `--tool node@24` のように、実行にツールを追加します。                                                                                                                                                                    |
+| `--skip-tools`                | タスクの開始前に、不足しているツールをインストールしません。                                                                                                                                                               |
+| `-r`, `--raw`                 | stdin、stdout、stderr を各タスクに直接接続し、一度に1つのタスクを実行します。redaction（値の削除）は適用されません。ただし、[シークレット（原文）](https://mise.jdx.dev/tasks/task-configuration.html#secrets) を受け取るタスクは `--raw` を無視するため、それらのタスクには適用されます。 |
+
+`--timeout` を渡した場合でも、タスク自身の [`timeout`（原文）](https://mise.jdx.dev/tasks/task-configuration.html#timeout) は引き続きそのコマンドを制限します。
+
+### タスクが失敗したとき {#when-a-task-fails}
+
+デフォルトでは、タスクが失敗すると実行が停止します。mise はまだ実行中のタスクを（Unix では SIGTERM で）停止し、新しいタスクを開始しません。ただし、すでに開始したタスクの [`depends_post`（原文）](https://mise.jdx.dev/tasks/architecture.html#depends-post) タスクは例外です。実行は、失敗したタスクの終了ステータスで終了します。
+
+`--continue-on-error` を指定すると、実行中のタスクは最後まで実行され、残りのタスクも、失敗したタスクに依存するタスクを含めて開始されます。最後に mise は失敗したタスクを一覧表示し、ゼロ以外のステータスで終了します。
+
+## 出力 {#output}
+
+タスクが並列に実行されるとき、mise は各出力行にタスク名のラベルを付けます（`prefix`）。一度に1つのタスクしか実行できない場合（単一のタスク、依存関係の連鎖、または `--jobs 1`）は、出力を直接表示します（`interleave`）。スタイルは `--output`、`MISE_TASK_OUTPUT`、[`task.output`（原文）](https://mise.jdx.dev/configuration/settings.html#task.output) 設定項目、またはタスクの [`output`（原文）](https://mise.jdx.dev/tasks/task-configuration.html#output) プロパティで選択します。
+
+| スタイル      | 出力                                                                                                                                       |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `prefix`     | タスク名のラベルを付けた各行。                                                                                                                 |
+| `interleave` | 届いたとおりの出力。ラベルは付きません。                                                                                                         |
+| `keep-order` | ラベル付きの行。1つのタスクはライブでストリーミングされ、他のタスクはバッファされて順番に表示されます。                                                     |
+| `replacing`  | 新しい stdout の行が直前の行を置き換えます。stderr はそのまま表示されます。                                                                          |
+| `timed`      | ラベル付きの stdout の行。各行は少なくとも1秒間はタスクの最新行として表示され続け、それより早く置き換えられた行は破棄されます。stderr はそのまま表示されます。 |
+| `silent`     | エラーを除き、タスクからも mise からも何も表示しません。                                                                                            |
+
+詳細度はスタイルとは独立しています。`--quiet` は `[build] $ cargo build` のような mise 自身のメッセージを非表示にし、`--silent` はさらにタスクの出力も非表示にします。例えば `mise run --output prefix --quiet test` は、ラベルを保ったまま mise のメッセージを非表示にします。他の mise コマンドを変えずにすべてのタスクを quiet にするには、`[settings]` の下で [`task.quiet`（原文）](https://mise.jdx.dev/configuration/settings.html#task.quiet) を設定します。タスクは自身の `quiet` や `silent` プロパティを設定することもできます。`quiet` 出力スタイルは非推奨です。代わりに `--output interleave --quiet` を使ってください。
+
+## インタラクティブな入力 {#interactive-input}
+
+タスクが `interactive` または `raw` でない限り、stdin は `interleave` 出力のときにだけ接続されます。これは単一のタスク、順次実行の連鎖、`--jobs 1` のときのデフォルトであり、`--output interleave` を渡したときも該当します。並列実行時のデフォルトである `prefix` を含む他の出力スタイルでは、stdin は接続されません。出力に redaction が必要な場合、つまりタスクが [シークレット（原文）](https://mise.jdx.dev/tasks/task-configuration.html#secrets) を受け取る場合や、設定で `redact = true` または `redactions` によって値を [redaction（原文）](https://mise.jdx.dev/environments/secrets/#redaction) の対象にしている場合も、stdin は接続されません。
+
+プロンプトを表示するタスクなど、ターミナルを必要とするタスクには `interactive = true` を設定します。そのタスクは実行中、ターミナルへの排他的なアクセスを持ちます。`raw = true` は代わりに、コマンドごとに排他的なアクセスを取得します。どちらも出力の redaction とアーティファクトキャッシュを迂回します。[`interactive`（原文）](https://mise.jdx.dev/tasks/task-configuration.html#interactive) と [`raw`（原文）](https://mise.jdx.dev/tasks/task-configuration.html#raw) を参照してください。
+
+## 最新のタスクのスキップ {#skip-tasks-that-are-up-to-date}
+
+タスクに `sources` と `outputs` を指定すると、mise は出力が最新である間、そのタスクをスキップします。
+
+```mise-toml [mise.toml]
 [tasks.build]
-description = 'Build the CLI'
+description = "Build the CLI"
 run = "cargo build"
-sources = ['Cargo.toml', 'src/**/*.rs'] # skip running if these files haven't changed
-outputs = ['target/debug/mycli']
+sources = ["Cargo.toml", "src/**/*.rs"]
+outputs = ["target/debug/mycli"]
 ```
 
-これで、`target/debug/mycli` が `Cargo.toml` やどの ".rs" ファイルよりも新しい場合、そのタスクはスキップされます。これは最終更新タイムスタンプを使用しています。
-チェックサムのサポートを追加するのも難しくはないでしょう。
+出力がソースより新しく、最後に成功した実行以降に何も変更されていない間は、mise はタスクを実行する代わりに `[build] sources up-to-date, skipping` と表示します。正確な検査内容は [タスクが古くなる条件（原文）](https://mise.jdx.dev/tasks/caching.html#what-makes-a-task-stale) に一覧があります。それでも実行するには `mise run --force build` を使います。[タスクのキャッシュ（原文）](https://mise.jdx.dev/tasks/caching.html) では、削除された出力を復元できるアーティファクトキャッシュについても説明しています。
 
-## ファイルの監視 {#watching-files}
+## ファイル変更時のタスクの再実行 {#rerun-tasks-when-files-change}
 
-ソースが変更されたときにタスクを実行するには、[`mise watch`（原文）](https://mise.jdx.dev/cli/watch.html) を使います。
+[`mise watch`（原文）](https://mise.jdx.dev/cli/watch.html) はタスクを実行し、そのソースが変更されると再実行します。
 
-```bash
+```sh
 mise watch build
 ```
 
-現在、これは単に `watchexec` を呼び出しているだけです（`watchexec` は好きな方法でインストールできます。mise を使う場合は `mise use -g watchexec@latest` です。
-これは将来変更される可能性があります）。
+mise は、タスクとその依存関係の `sources` を監視します。`sources` のないタスクは、現在のディレクトリを監視します。開発サーバーのように実行し続けるプロセスの場合は、変更のたびに再起動します。
 
-## `mise run` の省略形 {#mise-run-shorthand}
-
-タスクは `mise run <TASK>` または `mise <TASK>` で実行できます — ただし後者は、その名前が mise のコマンドと衝突しない場合に限ります。
-mise が後で衝突する名前のコマンドを追加する可能性があるため、スクリプトやドキュメントでは
-`mise run <TASK>` を使うことが推奨されます。
-
-## 実行順序 {#execution-order}
-
-[depends（原文）](https://mise.jdx.dev/tasks/task-configuration.html#depends)、[wait_for（原文）](https://mise.jdx.dev/tasks/task-configuration.html#wait-for)、[depends_post（原文）](https://mise.jdx.dev/tasks/task-configuration.html#depends-post) を使って、実行順序を制御できます。
-
-```toml
-[tasks.build]
-run = "echo 'build'"
-
-[tasks.test]
-run = "echo 'test'"
-depends = ["build"]
+```sh
+mise watch --restart dev
 ```
 
-これにより、`build` タスクが `test` タスクより前に実行されることが保証されます。
+`mise run` と同様に、複数のタスクは `:::` で区切ります。タスク名を指定しない場合、`mise watch` は `default` タスクを実行します。`mise watch` は [watchexec](https://github.com/watchexec/watchexec) を使います。`mise use watchexec` でインストールするか、自分で `PATH` に置いてください。
 
-他のタスクを並列または順番に実行する mise タスクを定義することもできます。
+`mise watch` は、`--debounce`、`--clear`、`--shell` などの watchexec のオプションを watchexec に引き渡します。`-E` と `-q` は mise 自身の `--env` と `--quiet` のままであるため、watchexec の `--env` と `--quiet` は、`mise watch` では `--watchexec-env` と `--watchexec-quiet` と書きます。
 
-```toml
-[tasks.example1]
-run = "echo 'example1'"
+```sh
+mise watch -E dev --watchexec-env LOG_LEVEL=debug build
+```
 
-[tasks.example2]
-run = "mise example2"
+## タスクの環境 {#task-environment}
 
-[tasks.example3]
-run = "echo 'example3'"
+タスクは、プロジェクトの [環境変数](/environments/) とツールに加えて、次の変数を持った状態で実行されます。
 
-[tasks.one_by_one]
-run = [
-    { task = "example1" }, # will wait for example1 to finish before running the next step
-    { tasks = ["example2", "example3"] }, # these 2 are run in parallel
-]
+| 変数                         | 値                                                                                                                                                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MISE_ORIGINAL_CWD`         | mise を実行したディレクトリ。                                                                                                                                                                                 |
+| `MISE_CONFIG_ROOT`          | タスクを定義しているファイルの [設定ルート](/configuration.html#config-root)。例えば `~/proj/mise.toml` と `~/proj/.config/mise.toml` のどちらでも `~/proj` です。                                                       |
+| `MISE_PROJECT_ROOT`         | どのディレクトリから実行したかにかかわらず、タスクを定義しているプロジェクトのルート。モノレポではサブプロジェクトのディレクトリです。グローバルタスクやリモートタスクでは、それを実行したプロジェクトです。                                       |
+| `MISE_MONOREPO_ROOT`        | 設定で `monorepo_root = true` を指定しているディレクトリ。[モノレポ（原文）](https://mise.jdx.dev/tasks/monorepo.html) でのみ設定されます。                                                                             |
+| `MISE_TASK_NAME`            | `mise tasks ls` で表示されるタスク名。ファイルタスクの名前には、別のタスクがすでにより短い名前を持っている場合を除き、スクリプトの拡張子が付きません。[ファイルタスクの名前](/tasks/file-tasks.html#task-grouping) を参照してください。 |
+| `MISE_TASK_FILE`            | タスクのスクリプト。ファイルタスクそのもの、または TOML タスクの `file` で指定されたファイルです。インラインの `run` を持つ TOML タスクでは、それを定義している設定ファイルです。                                                    |
+| `MISE_TASK_DIR`             | `MISE_TASK_FILE` を含むディレクトリ。                                                                                                                                                                         |
+| `MISE_TASK_COLOR`           | タスクのラベルの色を表す ANSI シーケンス。色が無効な場合、タスクが quiet の場合、または出力スタイルがラベルを表示しない場合（`interleave`、`silent`）は空です。                                                                   |
+| `MISE_ENV`                  | 何らかの [設定環境](/configuration/environments.html) が設定されている場合の、有効な設定環境のカンマ区切りの一覧。                                                                                                   |
+| `TRACEPARENT`, `TRACESTATE` | [OpenTelemetry（原文）](https://mise.jdx.dev/tasks/opentelemetry.html#trace-propagation) のエクスポートが有効な場合の、タスクのトレースコンテキスト。                                                                  |
+| `usage_*`                   | タスクの [引数とオプション（原文）](https://mise.jdx.dev/tasks/task-arguments.html) の値。                                                                                                                        |
+
+`~/proj/.config/mise.toml` 内の TOML タスクでは、`MISE_TASK_DIR` は `~/proj/.config` ですが、`MISE_CONFIG_ROOT` は `~/proj` です。`MISE_TASK_COLOR` を使って表示する場合は、テキストの後で色をリセットしてください。
+
+```sh
+printf '%smessage\033[0m\n' "$MISE_TASK_COLOR"
 ```

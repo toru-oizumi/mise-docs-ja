@@ -1,112 +1,111 @@
 ---
 title: mise のインストール
+description: "Install mise on macOS, Linux, or Windows, verify the executable, and keep it up to date."
 upstreamPath: docs/installing-mise.md
 upstreamUrl: https://mise.jdx.dev/installing-mise.html
-upstreamRef: 1c7db9f9
-upstreamDate: "2026-08-12"
+upstreamRef: 5749c813
+upstreamDate: "2026-10-13"
 ---
 
 # mise のインストール {#installing-mise}
 
-`mise` を初めて使う場合は、まず [はじめに](/getting-started) ガイドに従ってください。
+プラットフォームに合ったインストール方法を選び、実行ファイルを確認してから、[シェルをセットアップ（原文）](https://mise.jdx.dev/shell-setup.html)してください。最初のプロジェクトを手順に沿って進めたい場合は、[はじめに](/getting-started.html) を参照してください。
 
-## インストール方法 {#installation-methods}
+## 方法の選択 {#installation-methods}
 
-このページでは、システムに `mise` をインストールするさまざまな方法を紹介します。
+| プラットフォーム | 推奨                                                                       | 代替                                                                                                |
+| ---------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| macOS            | [mise.run](#mise-run)                                                      | [Homebrew](#homebrew)、[MacPorts](#macports)、[packslip](#packslip)（Apple シリコン）               |
+| Linux            | [mise.run](#mise-run)                                                      | [packslip](#packslip)、[apt](#apt)、[dnf](#dnf)、[pacman](#pacman)、[apk](#apk)、[その他](#linux)   |
+| Windows          | [winget](#windows-winget)                                                  | [Scoop](#windows-scoop)、[Chocolatey](#windows-chocolatey)、[packslip](#packslip)                   |
+| CI               | [mise-action またはコミットしたラッパー](/continuous-integration.html)     |                                                                                                     |
+| Docker           | [公式イメージ（原文）](https://mise.jdx.dev/mise-cookbook/docker.html)     |                                                                                                     |
 
-| プラットフォーム  | 推奨           | 代替               |
-| ----------------- | -------------- | ------------------ |
-| macOS             | mise.run       | Homebrew           |
-| Linux             | mise.run       | システムパッケージ |
-| Windows           | Scoop          | winget             |
-| 任意（Rust 利用者） | cargo binstall | cargo install     |
-| CI/Docker         | mise.run       | GitHub Releases    |
+mise.run、packslip、[GitHub Releases](#github-releases) は公式のリリースバイナリをインストールします。これらは mise の最適化されたリリースプロファイルでビルドされており、`mise self-update` で更新できます。パッケージマネージャー版のビルドはリリースより遅れることがあり、Homebrew のフォーミュラのビルドは目に見えて遅く、サイズも大きくなることがあります。
 
-`mise.run` によってインストールされる公式のシングルバイナリリリースは、macOS と Linux での推奨方法です。これらのバイナリは mise
-の最適化されたリリースプロファイルでビルドされており、`mise self-update` で即座に更新できます。Homebrew を含むパッケージマネージャー版のビルドは最適化の度合いが低く、mise
-のリリース後すぐには利用できない場合があります。
+1台のマシンでは1つの方法だけを使ってください。`PATH` 上に2つのインストールがあると、古いバイナリが使われたままになることがあります。[実行ファイルの確認](#verify-the-executable) を参照してください。
 
-::: tip どのインストール方法が自動更新される？
-パッケージマネージャー（apt、dnf、brew、pacman など）は、システムパッケージを更新すると mise も更新します。他の方法でインストールした場合は、`mise self-update` で更新できます。
-:::
+## 公式のリリースバイナリ {#recommended}
 
-::: tip mise を最新の状態に保つ
-mise は aqua、GitHub のリリース、言語パッケージレジストリ、システムパッケージマネージャーなど、多くの外部レジストリやバックエンドに接続します。これらのサービスは時間とともに変化するため、mise は CLI
-を最近のバージョンに保つことで最もよく機能します。
-
-プロジェクトや組織は、新しい mise の機能が必要な場合、全ユーザーを特定の mise 実行ファイルに固定するのではなく、一般的に [`min_version`](/configuration.html#minimum-mise-version)
-を設定するべきです。特定の mise バージョンを固定したりブートストラップしたりする方法はありますが、ユーザーを1つの mise バージョンに固定することは一般的には推奨されません。mise を古いバージョンに固定することは、`apt update`
-や `brew update` がパッケージメタデータを更新するのを妨げるのと同じです。非推奨の通知が見えなくなり、aqua-registry のような上流の連携が陳腐化する可能性があります。破壊的変更は長い非推奨化プロセスを経ない限り避けられるため、最新の状態を保つことは通常は低リスクであるはずです。
-:::
-
-### <https://mise.run> {#mise-run}
-
-`mise` が `PATH` 上にある必要はない点に注意してください。シェルの rc
-ファイルで activate スクリプトを実行すれば、mise は自動的に自身を `PATH` に追加します。
+### インストールスクリプト（mise.run） {#mise-run}
 
 ```sh
-curl https://mise.run | sh
+curl -fsSL https://mise.run | sh
 ```
 
-オプション付きの場合
+このスクリプトは実行ファイルを `~/.local/bin/mise` にインストールします。このディレクトリが `PATH` 上にある必要はありません。[mise を有効化（原文）](https://mise.jdx.dev/shell-setup.html)すると、mise が自身のディレクトリを追加します。別のパスを選ぶ場合は、次のようにします（その親ディレクトリはユーザーが書き込み可能である必要があります）。
 
 ```sh
-curl https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise sh
+curl -fsSL https://mise.run | MISE_INSTALL_PATH="$HOME/bin/mise" sh
 ```
 
-#### シェル別のインストール + 有効化 {#shell-specific-installation-activation}
+`MISE_VERSION` を指定しない場合、スクリプトは実行時点から少なくとも 24 時間前までに公開された最新の安定版リリースを選び、インストール先のパスにある既存の実行ファイルが同じリリースかそれより新しい場合はそれを残します。再現可能なインストールにするには `MISE_VERSION` を設定します。
 
-より簡単なセットアップのために、mise をインストールしてシェルの設定ファイルに有効化を自動的に設定するシェル別のエンドポイントを使用できます。
+```sh
+curl -fsSL https://mise.run | MISE_VERSION=v2026.10.4 sh
+```
+
+#### インストールと有効化を一度に行う {#shell-specific-installation-activation}
+
+シェル別のエンドポイントは、mise をインストールし、そのシェルの起動ファイルに有効化の設定を追記します。
 
 ::: code-group
 
 ```sh [zsh]
-curl https://mise.run/zsh | sh
-# Installs mise and adds activation to ~/.zshrc
+curl -fsSL https://mise.run/zsh | sh
+# adds activation to ${ZDOTDIR:-$HOME}/.zshrc
 ```
 
 ```sh [bash]
-curl https://mise.run/bash | sh
-# Installs mise and adds activation to ~/.bashrc
+curl -fsSL https://mise.run/bash | sh
+# adds activation to ~/.bashrc
 ```
 
 ```sh [fish]
-curl https://mise.run/fish | sh
-# Installs mise and adds activation to ~/.config/fish/config.fish
+curl -fsSL https://mise.run/fish | sh
+# adds activation to ~/.config/fish/config.fish
 ```
 
 :::
 
-これらのシェル別インストーラーは、以下を行います。
+ファイル内にすでに自身のマーカーコメントがある場合、これらは追記をスキップします。ユーザーやパッケージマネージャーが別の方法で追加した有効化の設定は認識しないため、以前に有効化を設定したことがある場合は先にファイルを確認してください。
 
-- メインのインストーラーと同じロジックで mise をインストールします
-- シェルの設定ファイルを自動的に検出します
-- 有効化の行がまだ無い場合は追加します
-- すでに設定されている場合は有効化の追加をスキップします（複数回実行しても安全です）
+#### インストーラーのオプション {#installer-options}
 
-オプション:
+スクリプトは TOML の設定項目ではなく、以下の環境変数を読み取ります。
 
-- `MISE_DEBUG=1` – デバッグログを有効にします
-- `MISE_QUIET=1` – エラー以外の出力を無効にします
-- `MISE_INSTALL_PATH=/some/path` – バイナリのパスを変更します（デフォルト: `~/.local/bin/mise`）
-- `MISE_VERSION=v2025.12.0` – 特定のバージョンをインストールします
-- `MISE_INSTALL_SKIP_IF_EXISTS=1` – インストール先のパスにある mise バイナリがすでに要求されたバージョンと一致している場合、ダウンロードとインストールをスキップします
+| 変数                                   | 効果                                                                                                                                                  |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MISE_INSTALL_PATH`                    | 実行ファイルのパス。デフォルトは `~/.local/bin/mise`。                                                                                                |
+| `MISE_VERSION`                         | インストールするリリース（`v2026.10.4` など）。リリース経過時間による待機を回避します。                                                               |
+| `MISE_SELF_UPDATE_MINIMUM_RELEASE_AGE` | これより新しいリリースをスキップします。`s`、`m`、`h`、`d`、`w` のいずれかを付けた整数（`7d` など）で指定し、待機なしにするには `0s`。未設定時は `MISE_MINIMUM_RELEASE_AGE`、次に `24h` にフォールバックします。 |
+| `MISE_INSTALL_SKIP_IF_EXISTS`          | `1` にすると、インストール先のパスにある実行ファイルがすでに選択されたバージョンである場合にダウンロードをスキップします。                             |
+| `MISE_INSTALL_MUSL`                    | `1` にすると、静的な musl ビルドをインストールします。                                                                                                |
+| `MISE_INSTALL_OS`, `MISE_INSTALL_ARCH` | 検出されたプラットフォームを上書きします。例えば `MISE_INSTALL_ARCH=x64` にすると Apple シリコン上で Intel ビルドをインストールします。musl ビルドにするにはアーキテクチャに `-musl` を付けます。 |
+| `MISE_INSTALL_EXT`                     | アーカイブ形式。`tar.zst` または `tar.gz`。`zstd` が利用できる場合のデフォルトは `tar.zst`。                                                           |
+| `MISE_INSTALL_FROM_GITHUB`             | `1` にすると、mise.jdx.dev ではなく GitHub Releases からダウンロードします。                                                                          |
+| `MISE_INSTALL_HELP`                    | `0` にすると、インストール後に有効化のヒントを表示しません。                                                                                          |
+| `MISE_DEBUG`, `MISE_QUIET`             | `1` にすると、それぞれデバッグ出力を表示する／エラーのみを表示します。                                                                                |
 
-インストールスクリプトが改ざんされていないことを確認したい場合は、
+#### インストールスクリプトの検証 {#verify-the-install-script}
+
+実行する前にスクリプトの署名を確認するには、次のようにします。
 
 ```sh
 gpg --keyserver hkps://keys.openpgp.org --recv-keys 24853EC9F655CE80B48E6C3A8B81C9D17413A06D
-curl https://mise.jdx.dev/install.sh.sig | gpg --decrypt > install.sh
-# ensure the above is signed with the mise release key
+curl -fsSL -o install.sh.sig https://mise.jdx.dev/install.sh.sig
+gpg --output install.sh --decrypt install.sh.sig
+```
+
+GPG が、フィンガープリント `24853EC9F655CE80B48E6C3A8B81C9D17413A06D` のリリース鍵による有効な署名であると報告することを確認してください。ダウンロードまたは確認が失敗した場合は、そこで中止し、出力されたファイルを実行しないでください。確認に成功したら、次を実行します。
+
+```sh
 sh ./install.sh
 ```
 
-::: tip
-`MISE_VERSION` でバージョンを変更しない限り、インストールスクリプトはダウンロードされた時点の最新バージョンに固定され、ファイル内にチェックサムが含まれます。このため、このファイルをダウンロードしてプロジェクトに配置しておくことは、そのスクリプトでインストールする誰もが完全に同じ
-mise バイナリを取得できるようにする優れた方法です。
-:::
+#### サポートされるプラットフォーム {#supported-platforms}
 
-サポートされる os/arch:
+スクリプトは以下のいずれかのビルドをインストールします。
 
 - `macos-x64`
 - `macos-arm64`
@@ -114,26 +113,104 @@ mise バイナリを取得できるようにする優れた方法です。
 - `linux-x64-musl`
 - `linux-arm64`
 - `linux-arm64-musl`
-- `linux-armv6`
-- `linux-armv6-musl`
 - `linux-armv7`
 - `linux-armv7-musl`
 
-他の環境が必要な場合は、`cargo install mise` でコンパイルしてください（後述）。
+[GitHub Releases](#github-releases) には、同じビルドに加えて `windows-x64` と `windows-arm64` があります。
 
-### apk {#apk}
+`linux-x64`、`linux-arm64`、`linux-armv7` のビルドは動的リンクされており、glibc 2.18 以降が必要です。`-musl` のビルドは静的で glibc を必要としません。Alpine Linux のような musl のシステムや、古い glibc のシステムではこちらを使ってください。
 
-Alpine Linux の場合:
+スクリプトは musl のシステムでは musl ビルドを選びます。glibc のシステムでは glibc のバージョンを確認せずに glibc ビルドを選ぶため、glibc が 2.18 より古い場合は自分で musl ビルドを選んでください。
 
 ```sh
-apk add mise
+curl -fsSL https://mise.run | MISE_INSTALL_MUSL=1 sh
 ```
 
-_mise は [コミュニティリポジトリ](https://gitlab.alpinelinux.org/alpine/aports/-/blob/master/community/mise/APKBUILD) にあります。_
+::: details glibc の最小バージョンを引き上げる際の方針
+
+mise が glibc の最小バージョンを引き上げる前に、それより古いバージョンを持つすべてのディストリビューションが、ベンダーの標準サポート終了を迎えている必要があります。Ubuntu ESM、RHEL ELS、SUSE LTSS などの延長サポートプログラムは、この期間を延長しません。それらのシステムの利用者は静的な musl ビルドを使用できます。
+
+以下の表は、いくつかのディストリビューションの標準サポート終了日を示しています。
+
+| glibc  | ディストリビューション                                 | 標準サポート終了                              |
+| ------ | ------------------------------------------------------ | --------------------------------------------- |
+| ≤ 2.27 | RHEL 7, Ubuntu 16.04 / 18.04, Debian 9, Amazon Linux 2 | 終了済み（最後: Amazon Linux 2、2026-06-30）  |
+| 2.28   | Debian 10                                              | 2024-06-30 に終了                             |
+| 2.28   | RHEL 8, Rocky 8, AlmaLinux 8                           | 2029-05-31                                    |
+| 2.31   | Ubuntu 20.04, Debian 11                                | 終了済み（最後: Debian 11、2026-08-31）       |
+| 2.34   | Amazon Linux 2023                                      | 2029-06-30                                    |
+| 2.34   | RHEL 9, Rocky 9, AlmaLinux 9                           | 2032-05-31                                    |
+| 2.35   | Ubuntu 22.04                                           | 2027-06-01                                    |
+
+最小バージョンは引き続き glibc 2.18 です。これらの日付は今後の互換性の変更の参考にするもので、リリーススケジュールを定めるものではありません。表に載っていないディストリビューションにも同じサポート方針が適用されます。
+
+:::
+
+その他のプラットフォームでは、[Cargo でソースからビルド](#cargo)してください。
+
+### packslip {#packslip}
+
+[packslip](https://packslip.dev) は、mise のインストールスクリプトを実行せずに、署名された mise の上流リリースをインストールします。mise の GitHub リポジトリに対して Sigstore の署名と透明性ログのエントリーを検証し、アーカイブのダイジェストとサイズを確認したうえで、完全なアーカイブから `mise` 実行ファイルを公開します。
+
+packslip 1.5.1 以降を、Linux x64 または arm64、macOS arm64、Windows x64 または arm64 で使用してください。Intel Mac では別のインストール方法が必要です。
+
+packslip を、署名された [APT または RPM リポジトリ](https://packslip.dev/docs/distributions/) か、[packslip のはじめにガイド](https://packslip.dev/docs/getting-started/) にある他の方法のいずれかでインストールしてから、mise をインストールします。
+
+```sh
+packslip install github.com/jdx/mise --pin ps1_nlhmwtfeufglxv5myvwvronk7a
+~/.local/bin/mise --version
+```
+
+packslip はインストールしたコマンドのパスを表示します。通常の Unix ユーザーでは `~/.local/bin/mise`、root では `/usr/local/bin/mise` です。`PATH` やシェルのファイルは変更しません。
+
+`--pin` は mise の GitHub リポジトリのフィンガープリントです。これにより、リポジトリの名前が変更されたり、別のリポジトリがその名前を引き継いだりしても、packslip は mise 自身のリリースだけを受け入れます。`--pin` を指定しない場合、packslip は初回使用時にその名前に対して GitHub が返すリポジトリを信頼し、そのマシンでの以降のインストールをそのリポジトリに限定します。
+
+`--version` を指定しない場合、または `--version latest` を指定した場合、packslip は現在の安定版リリースをインストールします。特定のリリースをインストールするには、次のようにします。
+
+```sh
+packslip install github.com/jdx/mise --version 2026.10.4 \
+  --pin ps1_nlhmwtfeufglxv5myvwvronk7a
+```
+
+このインストールでは `mise self-update` が機能し、`packslip install` を再実行すると、要求したリリースで mise が置き換えられます。packslip は、packslip 自身も mise も自動では更新しません。システムスコープ、インストール先の上書き、信頼の設定については [packslip のインストールガイド](https://packslip.dev/docs/bootstrap/) を、mise が新しいリリースに移っても packslip を固定したままにする方法については [Docker のページ（原文）](https://mise.jdx.dev/mise-cookbook/docker.html#bootstrap-with-packslip) を参照してください。
+
+## macOS {#macos}
+
+macOS では [インストールスクリプト](#mise-run) が推奨方法です。
+
+### Homebrew {#homebrew}
+
+```sh
+brew install mise
+```
+
+Homebrew は独自の設定でソースから mise をビルドします。[mise.run](#mise-run) の公式バイナリの方が高速で、より早く提供されます。このフォーミュラはシェルの自動補完をインストールし、fish では mise を自動的に有効化します。
+[Homebrew フォーミュラ](https://formulae.brew.sh/formula/mise)
+
+### MacPorts {#macports}
+
+```sh
+sudo port install mise
+```
+
+[MacPorts のポート](https://ports.macports.org/port/mise/)
+
+## Linux {#linux}
+
+Linux では [インストールスクリプト](#mise-run) が推奨方法です。以下のパッケージは、システムの他の部分と一緒に更新されます。
 
 ### apt {#apt}
 
-Ubuntu 26.04 以降では、mise は PPA から利用できます。
+Debian 11 以降および Ubuntu 22.04 以降では、extrepo で mise のリポジトリを有効化します。
+
+```sh
+sudo apt install -y extrepo
+sudo extrepo enable mise
+sudo apt update
+sudo apt install -y mise
+```
+
+Ubuntu 26.04 以降では、代わりに PPA を使用できます。
 
 ```sh
 sudo add-apt-repository -y ppa:jdxcode/mise
@@ -141,13 +218,40 @@ sudo apt update
 sudo apt install -y mise
 ```
 
-Debian 11 以降および Ubuntu 22.04 以降では、extrepo を使って mise のリポジトリを有効化できます。
+### dnf {#dnf}
+
+mise は [jdxcode/mise COPR](https://copr.fedorainfracloud.org/coprs/jdxcode/mise/) にあります。
+
+#### Fedora 43 以降、RHEL 10、CentOS Stream 10 とそのリビルド {#dnf-fedora}
 
 ```sh
-sudo apt install -y extrepo
-sudo extrepo enable mise
-sudo apt update
-sudo apt install -y mise
+sudo dnf copr enable jdxcode/mise
+sudo dnf install mise
+```
+
+#### RHEL 9、CentOS Stream 9、AlmaLinux 9、Rocky 9 {#dnf-el9}
+
+RHEL 9 の Rust は mise をビルドするには古すぎるため、これらすべてで動作する CentOS Stream 9 のビルドを有効化します。chroot 名を指定しないと、`dnf copr enable` は存在しない `epel-9` のビルドを探します。
+
+```sh
+sudo dnf copr enable jdxcode/mise centos-stream+epel-next-9
+sudo dnf install mise
+```
+
+### yum（RHEL 8 とそのリビルド） {#yum}
+
+```sh
+sudo yum install -y yum-utils
+sudo yum-config-manager --add-repo https://mise.jdx.dev/rpm/mise.repo
+sudo yum install -y mise
+```
+
+### zypper {#zypper}
+
+```sh
+sudo wget https://mise.jdx.dev/rpm/mise.repo -O /etc/zypp/repos.d/mise.repo
+sudo zypper refresh
+sudo zypper install mise
 ```
 
 ### pacman {#pacman}
@@ -160,49 +264,40 @@ sudo pacman -S mise
 
 [Arch パッケージ](https://archlinux.org/packages/extra/x86_64/mise/)
 
-### Cargo {#cargo}
+### apk {#apk}
 
-Cargo でソースからビルドします。
-
-```sh
-cargo install --locked mise
-```
-
-[cargo-binstall](https://github.com/cargo-bins/cargo-binstall) を使えばより速くできます。
+Alpine Linux では、mise は [コミュニティリポジトリ](https://gitlab.alpinelinux.org/alpine/aports/-/blob/master/community/mise/APKBUILD) にあります。
 
 ```sh
-cargo install cargo-binstall
-cargo binstall mise
+apk add mise
 ```
 
-main の最新コミットからビルドします。
+::: warning Alpine でのソースビルドのデフォルトは非推奨
+Alpine では、mise はデフォルトでツールをソースからコンパイルします。2026.8.0 からはこれについて警告が出るようになり、2027.8.0 ではデフォルトがプリコンパイル済みバイナリに切り替わります。コンパイルを続けるには、[`all_compile = true`（原文）](https://mise.jdx.dev/configuration/settings.html#all_compile) を設定してください。
+:::
+
+### Nix {#nix}
+
+nixpkgs 24.05 以降の場合:
 
 ```sh
-cargo install mise --git https://github.com/jdx/mise --branch main
+nix-env -iA nixpkgs.mise
 ```
 
-### dnf {#dnf}
+永続的なインストールをせずに試すには、`nix-shell -p mise --run "mise --version"` を実行します。
 
-#### Fedora 41 以降、CentOS Stream 9 以降、RHEL 10 以降 {#fedora-41-centos-stream-9-rhel-10}
+mise のリポジトリは flake でもあります。
 
-```sh
-dnf copr enable jdxcode/mise
-dnf install mise
+```nix
+inputs.mise.url = "github:jdx/mise";
+# then add inputs.mise.packages.${system}.mise to your packages
 ```
 
-#### RHEL 9 / AlmaLinux 9 / Rocky 9 {#rhel-9-almalinux-9-rocky-9}
+::: warning NixOS でのソースビルドのデフォルトは非推奨
+NixOS では、mise はデフォルトでツールをソースからコンパイルします。2026.8.0 からはこれについて警告が出るようになり、2027.8.0 ではデフォルトがプリコンパイル済みバイナリに切り替わります。プリコンパイル済みバイナリには [nix-ld](https://github.com/Mic92/nix-ld) が必要です。コンパイルを続けるには、[`all_compile = true`（原文）](https://mise.jdx.dev/configuration/settings.html#all_compile) を設定してください。
+:::
 
-RHEL 9 の AppStream は現在 Rust 1.88 に固定されており、これは mise がサポートする最小 Rust バージョンより古いバージョンです。代わりに
-CentOS Stream 9 のビルドを使用してください。生成されるバイナリは RHEL 9 派生ディストリビューションでも動作します。
-
-```sh
-dnf copr enable jdxcode/mise centos-stream+epel-next-9
-dnf install mise
-```
-
-[COPR のパッケージページ](https://copr.fedorainfracloud.org/coprs/jdxcode/mise/)
-
-### Snap (Linux) {#snap-linux}
+### Snap {#snap-linux}
 
 ```sh
 sudo snap install mise --classic
@@ -210,309 +305,162 @@ sudo snap install mise --classic
 
 [snapcraft.io のページ](https://snapcraft.io/mise)
 
-### Docker {#docker}
+## Windows {#windows}
 
-Docker で mise を使うためのヒントは [Docker クックブック（原文）](https://mise.jdx.dev/mise-cookbook/docker.html) を参照してください。
+Windows では winget が推奨方法です。インストール後に [PowerShell での有効化（原文）](https://mise.jdx.dev/shell-setup.html#powershell) を設定するか、[Windows のシェル（原文）](https://mise.jdx.dev/shell-setup.html#windows) の説明に従って cmd.exe 用に shim ディレクトリを `Path` に追加してください。
 
-::: details Dockerfile の例
+### winget {#windows-winget}
 
-```dockerfile
-FROM debian:13-slim
-
-RUN apt-get update \
-    && apt-get -y --no-install-recommends install sudo curl git ca-certificates build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-ENV MISE_DATA_DIR="/mise"
-ENV MISE_CONFIG_DIR="/mise"
-ENV MISE_CACHE_DIR="/mise/cache"
-ENV MISE_INSTALL_PATH="/usr/local/bin/mise"
-ENV PATH="/mise/shims:$PATH"
-RUN curl https://mise.run | sh
-RUN mise trust -a && mise install
-```
-
-:::
-
-### Homebrew {#homebrew}
-
-::: warning
-Homebrew のフォーミュラは便利ですが、推奨されるインストール方法ではありません。Homebrew は、公式のより最適化されたリリースバイナリとは別に mise をビルドします。最高のパフォーマンスと新しいリリースへの最速アクセスのためには、代わりに
-[`mise.run`](#mise-run) インストーラーを使用してください。
-:::
-
-```sh
-brew install mise
-```
-
-[Homebrew フォーミュラ](https://formulae.brew.sh/formula/mise)
-
-### npm {#npm}
-
-mise はプリコンパイルされたバイナリとして npm で利用できます。これは Node.js パッケージではなく、単に npm 経由で配布されているだけです。これは
-`package.json` や `npx` を使って mise をセットアップしたい JS プロジェクトに便利です。
-
-```sh
-npm install -g mise
-```
-
-完全にインストールせずに単発のコマンドで試してみたい場合は、npx を使用します。
-
-```sh
-npx mise exec python@3.11 -- python some_script.py
-```
-
-[npm パッケージ](https://www.npmjs.com/package/mise)
-
-旧来の [`@jdxcode/mise`](https://www.npmjs.com/package/@jdxcode/mise) パッケージも依然として公開されています。
-
-### GitHub Releases {#github-releases}
-
-[GitHub](https://github.com/jdx/mise/releases) から最新のリリースをダウンロードします。
-
-```sh
-curl -L https://github.com/jdx/mise/releases/download/v2025.12.0/mise-v2025.12.0-linux-x64 > /usr/local/bin/mise
-chmod +x /usr/local/bin/mise
-```
-
-### MacPorts {#macports}
-
-```sh
-sudo port install mise
-```
-
-[MacPorts のポート](https://ports.macports.org/port/mise/)
-
-### nix {#nix}
-
-Nix パッケージマネージャーの場合、リリース 24.05 以降で:
-
-```sh
-nix-env -iA mise
-```
-
-`mise-flake.packages.${system}.mise` を使ってパッケージを直接インポートすることもできます。これはすべてのデフォルトの
-Nix システムをサポートしています。
-
-::: tip NixOS はデフォルトでソースからコンパイルする
-プリコンパイルされたバイナリを使うには、[nix-ld](https://github.com/Mic92/nix-ld) を有効にし、[`all_compile`（原文）](https://mise.jdx.dev/configuration/settings.html#all_compile) を無効にしてください。
-:::
-
-### yum (RHEL 8, CentOS Stream 8, Amazon Linux 2) {#yum-rhel-8-centos-stream-8-amazon-linux-2}
-
-```sh
-yum install -y yum-utils
-yum-config-manager --add-repo https://mise.jdx.dev/rpm/mise.repo
-yum install -y mise
-```
-
-### zypper {#zypper}
-
-```sh
-sudo wget https://mise.jdx.dev/rpm/mise.repo -O /etc/zypp/repos.d/mise.repo
-sudo zypper refresh
-sudo zypper install mise
-```
-
-### Windows - Scoop {#windows-scoop}
-
-これは Windows に mise をインストールする推奨方法です。shim を自動的に PATH に追加します。
-
-```sh
-scoop install mise
-```
-
-[Scoop マニフェスト](https://github.com/ScoopInstaller/Main/blob/master/bucket/mise.json)
-
-### Windows - winget {#windows-winget}
-
-```sh
+```powershell
 winget install jdx.mise
 ```
 
 [winget マニフェスト](https://github.com/microsoft/winget-pkgs/tree/master/manifests/j/jdx/mise)
 
-### Windows - Chocolatey {#windows-chocolatey}
+### Scoop {#windows-scoop}
 
-::: info
-chocolatey 版は現在古くなっています。
-:::
+```powershell
+scoop install mise
+```
 
-```sh
+Scoop は独自のコマンド shim を通じて `mise` を `Path` に追加します。mise のツール用の shim ディレクトリは追加しないため、有効化または shim を別途設定してください。
+[Scoop マニフェスト](https://github.com/ScoopInstaller/Main/blob/master/bucket/mise.json)
+
+### Chocolatey {#windows-chocolatey}
+
+```powershell
 choco install mise
 ```
 
-### Windows - manual {#windows-manual}
+[Chocolatey パッケージ](https://community.chocolatey.org/packages/mise) は公式リリースより遅れることがあります。選ぶ前にバージョンを確認してください。
 
-[GitHub](https://github.com/jdx/mise/releases) から最新のリリースをダウンロードし、バイナリを PATH に追加します。
+### Windows での手動インストール {#windows-manual}
 
-シェルが `mise activate` をサポートしていない場合は、shim ディレクトリ（デフォルト: `%LOCALAPPDATA%\mise\shims`）を含むように PATH
-を編集しておくとよいでしょう。
-
-## シェル {#shells}
-
-### Bash {#bash}
-
-```sh
-echo 'eval "$(mise activate bash)"' >> ~/.bashrc
-```
-
-### Zsh {#zsh}
-
-```sh
-echo 'eval "$(mise activate zsh)"' >> "${ZDOTDIR-$HOME}/.zshrc"
-```
-
-### Fish {#fish}
-
-```sh
-echo 'mise activate fish | source' >> ~/.config/fish/config.fish
-```
-
-::: tip
-Homebrew や、場合によっては他のインストール方法では mise は自動的に有効化されるため、これは不要です。
-
-詳細は [`MISE_FISH_AUTO_ACTIVATE=1`](/configuration#mise-fish-auto-activate-1) を参照してください。
-:::
-
-### PowerShell {#powershell}
-
-::: warning
-実際のプロファイルの場所を確認するには [about_Profiles](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_profiles) のドキュメントを参照してください。
-親ディレクトリが存在しない場合は、先に作成する必要があります。
-:::
+[GitHub Releases](https://github.com/jdx/mise/releases) から `mise-v<version>-windows-x64.zip`（または `windows-arm64`）と `SHASUMS256.txt` をダウンロードします。PowerShell で zip のハッシュを表示します。
 
 ```powershell
-echo '(&mise activate pwsh) | Out-String | Invoke-Expression' >> $HOME\Documents\PowerShell\Microsoft.PowerShell_profile.ps1
+(Get-FileHash mise-v2026.10.4-windows-x64.zip -Algorithm SHA256).Hash
 ```
 
-### Nushell {#nushell}
+これは `SHASUMS256.txt` の `./mise-v2026.10.4-windows-x64.zip` の行と一致する必要があります。PowerShell は大文字で表示します。`minisign` がインストールされていれば、[手動ダウンロード](#github-releases) で示す方法で `SHASUMS256.txt` の署名も確認できます。その後、`mise.exe` と `mise-shim.exe` を含む `mise\bin` ディレクトリを展開し、`Path` に追加します。この2つのファイルは一緒に置いておいてください。mise は `mise-shim.exe` をコピーして shim を作成します。
 
-Nu は [`eval` をサポートしていません](https://www.nushell.sh/book/how_nushell_code_gets_run.html#eval-function)。
-`env.nu` と `config.nu` に追記して mise をインストールします。
+## 言語のパッケージマネージャー {#language-package-managers}
 
-```nushell
-'
-let mise_path = $nu.default-config-dir | path join mise.nu
-^mise activate nu | save $mise_path --force
-' | save $nu.env-path --append
-"\nuse ($nu.default-config-dir | path join mise.nu)" | save $nu.config-path --append
-```
+### Cargo {#cargo}
 
-dotfiles をきれいに保ちたい場合は、別のディレクトリに保存してから `$env.NU_LIB_DIRS` を更新することもできます。
-
-```nushell
-"\n$env.NU_LIB_DIRS ++= ($mise_path | path dirname | to nuon)" | save $nu.env-path --append
-```
-
-### Xonsh {#xonsh}
-
-`.xsh` ファイルは [コンパイルされない](https://github.com/xonsh/xonsh/issues/3953) ため、純粋な Python の
-import を使うことで起動時間を少し削減できます。例えば `~/.config/xonsh/mise.py` 設定ファイルに以下のコードを追加し、
-`~/.config/xonsh/rc.xsh` で `import mise` してください。
-
-```python
-from pathlib import Path
-from xonsh.built_ins import XSH
-
-ctx = XSH.ctx
-mise_init = subprocess.run([Path('~/bin/mise').expanduser(),'activate','xonsh'],capture_output=True,encoding="UTF-8").stdout
-XSH.builtins.execx(mise_init,'exec',ctx,filename='mise')
-```
-
-または `rc.xsh`/`.xonshrc` を使い続けます。
+ソースビルドには、そのリリースの `rust-version` を満たす Rust ツールチェーンに加えて、プラットフォームのコンパイラーとネイティブライブラリが必要です。[ビルドの依存関係（原文）](https://mise.jdx.dev/contributing.html#build-dependencies) を参照してください。
 
 ```sh
-echo 'execx($(~/bin/mise activate xonsh))' >> ~/.config/xonsh/rc.xsh # or ~/.xonshrc
+cargo install --locked mise
 ```
 
-`mise` はシェルの env `$PATH` と OS の environ `PATH` の両方を置き換えるため、設定でこの2つが異なる値に設定されていないよう注意してください（両者を一致させるために、設定の最後に
-`os.environ['PATH'] = xonsh.built_ins.XSH.env.get_detyped('PATH')` を実行させてもよいでしょう）
-
-### Elvish {#elvish}
-
-`rc.elv` に以下を追加します。
-
-```shell
-var mise: = (ns [&])
-eval (mise activate elvish | slurp) &ns=$mise: &on-end={|ns| set mise: = $ns }
-mise:activate
-```
-
-オプションで `mise` を `mise:mise` にエイリアスすると、`mise {activate,deactivate,shell}` をシームレスに統合できます。
-
-```shell
-edit:add-var mise~ {|@args| mise:mise $@args }
-```
-
-### その他のシェルは？ {#something-else}
-
-このプロジェクトのシェル関連のコードは非常に少ないため、新しいシェルを追加するのはまったく難しくありません。
-他のシェルがどのように実装されているかは [こちら](https://github.com/jdx/mise/tree/main/src/shell) を参照してください。もしお使いのシェルが現在サポートされていない場合は、統合のお手伝いを喜んでいたします。
-
-## 自動補完 {#autocompletion}
-
-::: tip
-一部のインストール方法では自動補完スクリプトが自動的にインストールされます。
-:::
-
-[`mise completion`（原文）](https://mise.jdx.dev/cli/completion.html) コマンドは、シェル用の自動補完スクリプトを生成できます。これには
-`usage` がインストールされている必要があります。インストールされていない場合は、以下でインストールします。
-
-```shell
-mise use -g usage
-```
-
-次に、以下のコマンドを実行してシェル用の補完スクリプトをインストールします。
-
-::: code-group
-
-```sh [bash]
-# This requires bash-completion to be installed
-mkdir -p ~/.local/share/bash-completion/completions/
-mise completion bash --include-bash-completion-lib > ~/.local/share/bash-completion/completions/mise
-```
-
-```sh [zsh]
-# If you use oh-my-zsh, there is a `mise` plugin. Update your .zshrc file with:
-# plugins=(... mise)
-
-# Otherwise, look where zsh search for completions with
-echo $fpath | tr ' ' '\n'
-
-# if you installed zsh with `apt-get` for example, this will work:
-mkdir -p /usr/local/share/zsh/site-functions
-mise completion zsh  > /usr/local/share/zsh/site-functions/_mise
-```
-
-```sh [fish]
-mise completion fish > ~/.config/fish/completions/mise.fish
-```
-
-:::
-
-その後、シェルの rc ファイルを source するか、シェルを再起動してください。
-
-## トラブルシューティング {#troubleshooting}
-
-インストール後に問題が発生した場合は、以下を実行します。
+[cargo-binstall](https://github.com/cargo-bins/cargo-binstall) は、コンパイルする代わりにビルド済みのバイナリをインストールします。
 
 ```sh
+cargo install --locked cargo-binstall
+cargo binstall mise
+```
+
+`main` の最新コミットをビルドするには、次のようにします。
+
+```sh
+cargo install --locked mise --git https://github.com/jdx/mise --branch main
+```
+
+### npm {#npm}
+
+npm の `mise` パッケージはプリコンパイルされたバイナリを配布するもので、Node.js のライブラリではありません。`package.json` や `npx` を通じて mise をセットアップする JavaScript プロジェクトに適しています。旧来の `@jdxcode/mise` パッケージではなく、`mise` をインストールしてください。
+
+```sh
+npm install -g mise
+```
+
+npx を使うと、npm のグローバルインストールをせずに mise を実行できます。npm はダウンロードをキャッシュし、mise がインストールするツールは通常どおり mise のデータディレクトリに置かれます。
+
+```sh
+npx --yes mise exec python@3.14 -- python --version
+```
+
+[npm パッケージ](https://www.npmjs.com/package/mise)
+
+## コンテナ {#docker}
+
+公式イメージは、Linux amd64 と arm64 向けに `ghcr.io/jdx/mise` と Docker Hub（`jdxcode/mise`）で公開されています。CI や開発用のイメージとしては `-debian` タグを使うか、scratch イメージから `COPY --from=` で静的バイナリをコピーしてください。タグ、ダイジェストの固定、Dockerfile については [Docker（原文）](https://mise.jdx.dev/mise-cookbook/docker.html) を参照してください。
+
+## 手動ダウンロード {#github-releases}
+
+[GitHub Releases](https://github.com/jdx/mise/releases) からリリースとプラットフォームに合ったファイルを選びます。例えば、Linux x64 の実行ファイルをカレントディレクトリにダウンロードするには、次のようにします。
+
+```sh
+mise_version=2026.10.4
+mise_platform=linux-x64
+curl -fL -o mise "https://github.com/jdx/mise/releases/download/v${mise_version}/mise-v${mise_version}-${mise_platform}"
+```
+
+各リリースには `SHASUMS256.txt` も含まれており、minisign（`SHASUMS256.txt.minisig`）と GPG（`SHASUMS256.asc`）で署名されています。チェックサムファイルの署名を確認してから、ダウンロードしたファイルをそれと照合します。以下のコマンドには `minisign` と `sha256sum` が必要で（macOS では `sha256sum -c` の代わりに `shasum -a 256 -c` を使います）、上で設定した変数と `mise` ファイルを再利用します。
+
+```sh
+base="https://github.com/jdx/mise/releases/download/v${mise_version}"
+curl -fL -O "$base/SHASUMS256.txt" -O "$base/SHASUMS256.txt.minisig"
+minisign -Vm SHASUMS256.txt -P RWTC3g8W3z4RZK3V3qv7fa1QY4JEWyBtqIHW+85QlJpZc5yG+uNYNBSZ &&
+  grep " ./mise-v${mise_version}-${mise_platform}$" SHASUMS256.txt | sed 's| ./mise-.*| mise|' | sha256sum -c
+```
+
+minisign の公開鍵は、リポジトリ内の [`minisign.pub`](https://github.com/jdx/mise/blob/main/minisign.pub) です。その後、書き込み可能なディレクトリに実行ファイルをインストールします。
+
+```sh
+mkdir -p ~/.local/bin
+install -m 755 ./mise ~/.local/bin/mise
+~/.local/bin/mise --version
+```
+
+## 実行ファイルの確認 {#verify-the-executable}
+
+```sh
+mise --version
 mise doctor
 ```
 
-これにより、mise のセットアップに関する一般的な問題を診断します。詳細は [mise doctor（原文）](https://mise.jdx.dev/cli/doctor.html) を参照してください。
+有効化する前は、デフォルトの mise.run によるインストールは `~/.local/bin/mise --version` と `~/.local/bin/mise doctor` として実行します。表示されたバージョンがインストールしたものと異なる場合は、Unix では `command -v mise`、PowerShell では `Get-Command mise` で、どのコピーが実行されているかを確認してください。
+
+mise はツール、キャッシュ、状態をホームディレクトリ以下に保存します。場所を変更するには [ディレクトリ（原文）](https://mise.jdx.dev/directories.html) を参照してください。その他の問題については [トラブルシューティング](/troubleshooting.html) を参照してください。
+
+## シェル {#shells}
+
+bash、zsh、fish、PowerShell、Nushell、Xonsh、Elvish で mise を有効化する方法と、シェルの自動補完をインストールする方法については、[シェルのセットアップ（原文）](https://mise.jdx.dev/shell-setup.html) を参照してください。
+
+## mise の更新 {#updating}
+
+パッケージマネージャーで mise をインストールした場合は、そのパッケージマネージャーで更新してください。それ以外の場合は [`mise self-update`（原文）](https://mise.jdx.dev/cli/self-update.html) を実行します。これは `--no-plugins` を渡さない限り、インストール済みのプラグインも更新します。`mise upgrade` はツールを更新するもので、mise 自体は更新しません。
+
+自動的に更新するには、グローバル設定で [`self_update.auto`（原文）](https://mise.jdx.dev/configuration/settings.html#self_update.auto) を有効にします。
+
+```sh
+mise settings self_update.auto=true
+```
+
+すると mise は、[`self_update.check_duration`（原文）](https://mise.jdx.dev/configuration/settings.html#self_update.check_duration) で設定された間隔、または `true` の代わりに指定した間隔（`mise settings self_update.auto=1d` など）で新しいリリースを確認します。新しいリリースがある場合は、対象となるインタラクティブなコマンドの前にそれをインストールし、新しいバイナリでコマンドを再実行します。CI、オフラインモード、非インタラクティブなセッション、およびパッケージ作成者がセルフアップデートを無効にしたインストールでは、確認をスキップします。
+
+`mise self-update` と自動更新は、[`self_update.minimum_release_age`（原文）](https://mise.jdx.dev/configuration/settings.html#self_update.minimum_release_age) より新しいリリースをスキップします。この値は [`minimum_release_age`（原文）](https://mise.jdx.dev/security.html#minimum-release-age) にフォールバックします。`mise self-update 2026.10.4` は、この待機なしで指定したリリースをインストールします。バイナリを置き換える前に、mise はリリースの署名を検証します。何を確認するかについては [packslip による検証（原文）](https://mise.jdx.dev/dev-tools/packslip-verification.html#self-update) を参照してください。
+
+組織は、[`self_update.repository`（原文）](https://mise.jdx.dev/configuration/settings.html#self_update.repository) と [`self_update.api_url`（原文）](https://mise.jdx.dev/configuration/settings.html#self_update.api_url) を使って、承認済みリリースのミラーから更新を配信できます。ミラーは公式のリリースのファイル名と署名を維持する必要があり、`api_url` は HTTPS を使用する必要があります。プライベートリポジトリと GitHub Enterprise では、mise の [GitHub トークン（原文）](https://mise.jdx.dev/dev-tools/github-tokens.html) の解決方法が使われます。これらはグローバル設定またはシステム設定で設定してください。プロジェクトの設定では mise はこれらを無視します。
+
+```toml [~/.config/mise/config.toml]
+[settings.self_update]
+repository = "myorg/mise-mirror"
+api_url = "https://github.example.com/api/v3"
+```
+
+mise は時間とともに変化するレジストリやリリース API とやり取りするため、最新の状態に保ってください。プロジェクトで新しい mise が必要な場合は、全員を1つの mise バージョンに固定するのではなく、[`min_version`](/configuration.html#minimum-mise-version) を設定してください。ディストリビューションのパッケージ作成者は、`mise self-update` を無効にして利用者をパッケージマネージャーに誘導できます。[mise のパッケージング（原文）](https://mise.jdx.dev/packaging.html) を参照してください。
 
 ## アンインストール {#uninstalling}
 
-mise をアンインストールするには `mise implode` を使用します。これにより mise のバイナリとすべてのデータが削除されます。詳細は
-`mise implode --help` を使用してください。
+パッケージマネージャーで管理されている CLI は、mise をインストールしたパッケージマネージャーで削除してください。スタンドアロンのインストールの場合は、まず削除内容をプレビューします。
 
-あるいは、完全にクリーンアップするために以下のディレクトリを手動で削除します。
+```sh
+mise implode --dry-run
+```
 
-- `~/.local/share/mise`（`MISE_DATA_DIR` または `XDG_DATA_HOME/mise` の場合もあります）
-- `~/.local/state/mise`（`MISE_STATE_DIR` または `XDG_STATE_HOME/mise` の場合もあります）
-- `~/.config/mise`（`MISE_CONFIG_DIR` または `XDG_CONFIG_HOME/mise` の場合もあります）
-- Linux の場合: `~/.cache/mise`（`MISE_CACHE_DIR` または `XDG_CACHE_HOME/mise` の場合もあります）
-- macOS の場合: `~/Library/Caches/mise`（`MISE_CACHE_DIR` の場合もあります）
+`mise implode` は、CLI、インストール済みのツール、キャッシュ、状態を削除します。システムのデータディレクトリがある場合はそれも含みます。`--config` を渡さない限り、ユーザーの設定ディレクトリは残します。`--dry-run` なしで実行する前に、表示されたパスを確認してください。環境変数によってパスが変わることがあります。
+
+その後、シェルの起動ファイルから有効化の行を削除し、インストールした自動補完のファイルがあれば削除してください。プロジェクトの `mise.toml` ファイルと、bootstrap でインストールされたホストのパッケージは mise のデータには含まれず、そのまま残ります。保存先のパスについては [ディレクトリ（原文）](https://mise.jdx.dev/directories.html) を参照してください。

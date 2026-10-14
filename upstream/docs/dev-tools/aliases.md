@@ -1,79 +1,119 @@
-# Tool Aliases
+---
+description: "Use [tool_alias] to point a tool name at a different backend or give a version request a stable name."
+---
 
-::: tip
-`[alias]` has been renamed to `[tool_alias]` to distinguish it from `[shell_alias]`.
-The old `[alias]` key still works but is deprecated.
+# Tool aliases
 
-For shell command aliases (like `alias ll='ls -la'`), see [Shell Aliases](/shell-aliases).
+Use `[tool_alias]` to point a tool name at a different backend or to give a
+version request a name. Put shared aliases in the project's `mise.toml`, so
+teammates get the alias along with the tool declaration, and personal ones in
+`~/.config/mise/config.toml`.
+
+Two other things in mise are called aliases. Registry aliases, such as `rg`
+for `ripgrep`, are alternate names built into the [registry](/registry.html);
+you do not define them. For command shortcuts such as `alias ll='ls -la'`, see
+[Shell aliases](/shell-aliases.html).
+
+::: warning Renamed configuration key
+`[alias]` was renamed to `[tool_alias]`. The old key still works but is
+deprecated and prints a warning.
 :::
 
-## Aliased Backends
+## Backend aliases {#aliased-backends}
 
-Tools can be aliased so that something like `node` which normally maps to `core:node` can be changed
-to a different backend instead.
+A backend alias changes where mise gets a tool. For example, keep mise's
+built-in Node.js even if someone has installed a `node` plugin, which would
+otherwise take precedence:
 
-```toml [~/.config/mise/config.toml]
+```toml [mise.toml]
 [tool_alias]
-node = 'github:company/our-custom-node'   # shorthand for https://github.com/company/our-custom-node
-erlang = 'aqua:company/our-custom-erlang' # use an aqua registry entry
+node = "core:node"
+
+[tools]
+node = "24"
 ```
 
-This can also be used to install multiple tools from the same GitHub release:
+Check the result with `mise tool node`, then run `mise install`. See
+[how backend selection works](/dev-tools/backends/#how-backend-selection-works)
+when an installed plugin or an environment variable picks a different source
+than you expect.
 
-```toml [~/.config/mise/config.toml]
+Aliases can also install separate release assets from one GitHub repository
+as separate tools:
+
+```toml [mise.toml]
 [tool_alias]
-dhall-json = 'github:dhall-lang/dhall-haskell'
-dhall-lsp = 'github:dhall-lang/dhall-haskell'
+dhall-json = "github:dhall-lang/dhall-haskell"
+dhall-lsp = "github:dhall-lang/dhall-haskell"
 
 [tools]
 dhall-json = { version = "v1.42.2", matching = "dhall-json" }
 dhall-lsp = { version = "latest", matching = "dhall-lsp-server" }
 ```
 
-The example above uses the [GitHub backend's `matching`](backends/github#matching) feature to download
-two distinct binaries from different releases in the same GitHub repository.
+Each alias has its own version request and
+[GitHub asset filter](/dev-tools/backends/github.html#matching), which helps
+with repositories that release several tools independently.
 
-## Aliased Versions
+## Version aliases {#aliased-versions}
 
-mise supports aliasing the versions of runtimes. One use-case for this is to define a stable name
-that points to a specific version, so you can reference it symbolically in
-`mise.toml`/`.tool-versions`. For example, you may want `lts-iron` to map to Node.js 20 so you can
-set it with `node = "lts-iron"`.
+A version alias gives a name to a version request. This keeps a team's Node.js
+release series in one place:
 
-User aliases can be created by adding a `tool_alias.<TOOL>.versions` section to
-`~/.config/mise/config.toml`:
-
-```toml
+```toml [mise.toml]
 [tool_alias.node.versions]
-lts-iron = '20'
-```
+project-lts = "24"
 
-Then reference the alias when pinning the tool:
-
-```toml
 [tools]
-node = "lts-iron"
+node = "project-lts"
 ```
 
-Plugins can also provide aliases via a `bin/list-aliases` script. Here is an example showing node.js
-versions:
+`project-lts` resolves as the request `24`, so it selects a 24.x release, not
+an exact patch version; use [mise.lock](/dev-tools/mise-lock.html) to record
+the resolved version. Changing the alias changes the request for every
+declaration that uses it.
 
-```bash
-#!/usr/bin/env bash
+Some backends provide aliases of their own, such as Node.js `lts` and
+`lts-jod`, and Java `lts`. You do not need to redefine them. Legacy asdf
+plugins provide theirs through a `bin/list-aliases` script that prints one
+alias and version per line.
 
-echo "lts-krypton 24"
-echo "lts-jod 22"
-echo "lts-iron 20"
+## Manage aliases from the command line {#manage-aliases}
+
+[`mise tool-alias ls`](/cli/tool-alias/ls.html) lists aliases, including the
+ones backends provide:
+
+```sh
+mise tool-alias ls node
 ```
 
-(mise's built-in node plugin already ships these LTS aliases; the example above shows the format
-that other plugins can use.)
+```text
+node  lts          24
+node  lts-argon    4
+node  lts-boron    6
+...
+```
 
-## Templates
+[`mise tool-alias set`](/cli/tool-alias/set.html) and
+[`mise tool-alias unset`](/cli/tool-alias/unset.html) edit your global config.
+Edit `mise.toml` directly for project aliases.
 
-Alias values can be templates, see [Templates](/templates) for details.
+```sh
+mise tool-alias set node project-lts 24  # version alias
+mise tool-alias set mytool github:owner/repo  # backend alias
+mise tool-alias unset node project-lts
+```
 
-```toml
+## Templates {#templates}
+
+Alias values support [templates](/templates.html). For example, read the
+release series from an environment variable, with a default:
+
+```toml [mise.toml]
 [tool_alias.node.versions]
-current = "{{exec(command='node --version')}}"
+project-lts = "{{ env.PROJECT_NODE_VERSION | default(value='24') }}"
 ```
+
+Set `PROJECT_NODE_VERSION` before running mise. Do not compute a tool's
+version by running that same tool from its alias template: mise may resolve
+the version before the tool is installed, or re-enter itself through a shim.
